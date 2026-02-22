@@ -97,12 +97,15 @@ if (!exists("IBMSEQ_SOURCED")) {
 
   args <- commandArgs(trailingOnly = TRUE)
   if (length(args) < 3) {
-    stop("Usage: Rscript 01_load_graph.R <name> <read_path> <save_path> [--no-dup|--with-dup]")
+    stop("Usage: Rscript 01_load_graph.R <name> <read_path> <save_path> [--no-dup|--with-dup|--dup-then-dedup]")
   }
   name      <- args[1]
   read_path <- args[2]
   save_path <- args[3]
-  dup_mode  <- if (length(args) >= 4 && args[4] %in% c("--no-dup", "--with-dup")) args[4] else "--no-dup"
+  # --dup-then-dedup はStep2でdedupするため、Step1では --with-dup と同じ扱い
+  dup_mode  <- if (length(args) >= 4 && args[4] %in% c("--no-dup", "--with-dup", "--dup-then-dedup")) {
+    if (args[4] == "--dup-then-dedup") "--with-dup" else args[4]
+  } else "--no-dup"
 
   dir.create(save_path, recursive = TRUE, showWarnings = FALSE)
   load_graph(name, read_path, save_path, dup_mode)

@@ -14,6 +14,7 @@
 # オプション（順不同で指定可）:
 #   --no-dup         : 重複エッジを除去してからクラスタリング（デフォルト）
 #   --with-dup       : 重複エッジを保持してクラスタリング
+#   --dup-then-dedup : 重複エッジを保持してクラスタリングし、クラスタリング後に除去
 #   <整数>           : min_cluster_size（デフォルト: 1000、テスト時は 3 など）
 #   --cores=N        : 並列計算コア数（デフォルト: 1）
 #                      72コア/512GBマシンなら --cores=9 程度が目安
@@ -73,6 +74,9 @@ no_rds           <- FALSE
 for (a in args[-(1:3)]) {
   if (a %in% c("--no-dup", "--with-dup")) {
     dup_mode <- a
+  } else if (a == "--dup-then-dedup") {
+    dup_mode    <- "--with-dup"
+    dedup_after <- TRUE
   } else if (grepl("^--cores=[0-9]+$", a)) {
     num_cores <- as.integer(sub("^--cores=", "", a))
   } else if (grepl("^--metrics=", a)) {
@@ -99,6 +103,7 @@ cat(paste0("  name             = ", name,                        "\n"))
 cat(paste0("  read_path        = ", read_path,                   "\n"))
 cat(paste0("  save_path        = ", save_path,                   "\n"))
 cat(paste0("  dup_mode         = ", dup_mode,                    "\n"))
+cat(paste0("  dedup_after      = ", dedup_after,                 "\n"))
 cat(paste0("  min_cluster_size = ", min_cluster_size,            "\n"))
 cat(paste0("  num_cores        = ", num_cores,                   "\n"))
 cat(paste0("  metrics          = ", paste(metrics, collapse=","), "\n"))
@@ -138,7 +143,7 @@ load_graph(name, read_path, save_path, dup_mode)
 # Step 2: Louvainクラスタリング（連結成分ごと）
 # ============================================================
 cat("\n--- Step 2: Clustering ---\n")
-run_clustering(name, save_path, num_cores = num_cores)
+run_clustering(name, save_path, num_cores = num_cores, dedup_after = dedup_after)
 
 # ============================================================
 # Step 3: 密度計算

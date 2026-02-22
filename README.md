@@ -19,7 +19,7 @@ Modifier: Masaki Suimye Morioka (mmorioka@dbcls.rois.ac.jp)
 3. [スクリプト一覧](#3-スクリプト一覧)
 4. [パイプライン全体の実行](#4-パイプライン全体の実行)
 5. [個別ステップの実行](#5-個別ステップの実行)
-6. [重複エッジの扱いについて（--no-dup / --with-dup）](#6-重複エッジの扱いについてno-dup--with-dup)
+6. [重複エッジの扱いについて（--no-dup / --with-dup / --dup-then-dedup）](#6-重複エッジの扱いについてno-dup--with-dup--dup-then-dedup)
 7. [SM モード（Suffix Mode）](#7-sm-モードsuffix-mode)
 8. [SM モード：検証・速度比較（sm_bench.R）](#8-sm-モード検証速度比較sm_benchr)
 9. [3モード比較（compare_modes.R）](#9-3モード比較compare_modesr)
@@ -121,6 +121,7 @@ Rscript r_script/00_main.R <name> <read_path> <save_path> [オプション]
 |---------------------|---------------|----------------------------------------------------------------|
 | `--no-dup`          | ✓（デフォルト）| 重複エッジ・自己ループを除去してからクラスタリング            |
 | `--with-dup`        | —             | 重複エッジを保持してクラスタリング（ike.R 互換）              |
+| `--dup-then-dedup`  | —             | 重複エッジを保持してクラスタリングし、**クラスタリング後**に除去 |
 | `<整数>`            | 1000          | min_cluster_size：指標計算対象クラスターの最小ノード数        |
 | `--cores=N`         | 1             | 並列計算コア数（72コア/512GBマシンなら `--cores=9` 程度が目安）|
 | `--metrics=A,B,...` | 全指標        | 計算する指標（`edge_density`,`umi_uei`,`ego_size`,`diameter`）|
@@ -241,7 +242,7 @@ Rscript r_script/05_plot.R <name> <save_path> [--from-tsv]
 
 ---
 
-## 6. 重複エッジの扱いについて（--no-dup / --with-dup）
+## 6. 重複エッジの扱いについて（--no-dup / --with-dup / --dup-then-dedup）
 
 `.link.gz` ファイルには同じノードペアを結ぶエッジが複数含まれる場合があります（重複エッジ）。この扱いがパイプラインの結果に影響します。
 
@@ -251,7 +252,7 @@ Rscript r_script/05_plot.R <name> <save_path> [--from-tsv]
 Rscript r_script/00_main.R <name> <read_path> <save_path> --no-dup 1000
 ```
 
-- `igraph::simplify()` を適用し、**重複エッジと自己ループを除去**してからクラスタリング・指標計算を実施
+- `igraph::simplify()` を Step 1（グラフ構築直後）に適用し、**重複エッジと自己ループを除去**してからクラスタリング・指標計算を実施
 - Edge Density の計算が理論的に正しくなる（重複エッジがあると分母に対して分子が水増しされる）
 - **通常の解析はこちらを使用してください**
 
@@ -265,15 +266,36 @@ Rscript r_script/00_main.R <name> <read_path> <save_path> --with-dup 1000
 - 旧スクリプト `ike.R` と同じ挙動
 - **Edge Density の値が実際より大きくなる可能性あり**（重複エッジが分子に加算されるため）
 
+### --dup-then-dedup（クラスタリング後に重複除去）
+
+```bash
+Rscript r_script/00_main.R <name> <read_path> <save_path> --dup-then-dedup 1000
+```
+
+- **Step 1**: 重複エッジを保持したままグラフを構築（`--with-dup` と同じ）
+- **Step 2**: Louvain クラスタリングを重複エッジあり状態で実施（重複エッジがクラスタリング結果に影響）
+- **Step 2 後半**: クラスタリング完了後に `igraph::simplify()` を適用して重複エッジを除去し、`_02_graph.rds` に保存
+- **Step 3 以降**: 重複除去済みグラフで Edge Density・Ego Size・Diameter を計算
+
+クラスタリングは重複エッジの情報を活用しつつ、指標計算では重複を除去した正確なグラフを用いたい場合に使用します。
+
+### 3モードの比較
+
+| モード              | Step1 simplify | クラスタリング | Step3以降 simplify | Edge Density |
+|---------------------|:--------------:|:--------------:|:------------------:|:------------:|
+| `--no-dup`          | ✓              | 重複なし       | —                  | 正確         |
+| `--with-dup`        | —              | 重複あり       | —                  | 過大評価     |
+| `--dup-then-dedup`  | —              | 重複あり       | ✓（Step2後）       | 正確         |
+
 ### 影響を受ける指標
 
-| 指標           | --no-dup への影響                         |
-|----------------|------------------------------------------|
-| Edge Density   | **影響大**：重複除去により値が下がる場合あり |
-| Cluster Size   | やや変化（重複ノードが統合されるため）    |
-| UMI/UEI カウント | ほぼ変化なし（ノード名ベースの集計）      |
-| Ego Size       | 微小変化                                  |
-| Diameter       | 微小変化                                  |
+| 指標             | --no-dup               | --with-dup             | --dup-then-dedup       |
+|------------------|------------------------|------------------------|------------------------|
+| クラスタリング結果 | 重複なしで分割         | 重複ありで分割         | 重複ありで分割         |
+| Edge Density     | 正確                   | 過大評価の可能性あり   | 正確                   |
+| UMI/UEI カウント | ほぼ同じ               | ほぼ同じ               | ほぼ同じ               |
+| Ego Size         | 重複なしグラフで計算   | 重複ありグラフで計算   | 重複なしグラフで計算   |
+| Diameter         | 重複なしグラフで計算   | 重複ありグラフで計算   | 重複なしグラフで計算   |
 
 ---
 
