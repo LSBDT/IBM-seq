@@ -19,6 +19,8 @@
 #   --cores=N        : 並列計算コア数（デフォルト: 1）
 #   --metrics=A,B,...: 計算する指標（edge_density, umi_uei, ego_size, diameter）
 #   --from-tsv       : 作図ステップで TSV から読み込む
+#   --no-rds         : Step 3/4 の指標 RDS ファイルを保存しない（TSV のみ出力）
+#                      --no-rds 指定時は自動的に --from-tsv が有効になる
 #
 # 使用例:
 #   Rscript sm_00_main.R V5P2_24aB_CTCF_2_3000 /data /output --no-dup 1000 --cores=9
@@ -54,6 +56,9 @@ for (a in args[-(1:3)]) {
     metrics <- strsplit(sub("^--metrics=", "", a), ",")[[1]]
   } else if (a == "--from-tsv") {
     from_tsv <- TRUE
+  } else if (a == "--no-rds") {
+    no_rds   <- TRUE
+    from_tsv <- TRUE
   } else if (grepl("^[0-9]+$", a)) {
     min_cluster_size <- as.integer(a)
   }
@@ -75,7 +80,8 @@ cat(paste0("  dedup_after      = ", dedup_after,                  "\n"))
 cat(paste0("  min_cluster_size = ", min_cluster_size,             "\n"))
 cat(paste0("  num_cores        = ", num_cores,                    "\n"))
 cat(paste0("  metrics          = ", paste(metrics, collapse = ","), "\n"))
-cat(paste0("  from_tsv         = ", from_tsv,                     "\n\n"))
+cat(paste0("  from_tsv         = ", from_tsv,                     "\n"))
+cat(paste0("  no_rds           = ", no_rds,                       "\n\n"))
 
 # ---- ライブラリ読み込み ----
 suppressPackageStartupMessages({
@@ -115,14 +121,16 @@ run_clustering(name, save_path, num_cores = num_cores, dedup_after = dedup_after
 # ============================================================
 cat("\n--- Step 3: Density ---\n")
 run_density(name, save_path, min_cluster_size, num_cores,
-            compute_edge_density = "edge_density" %in% metrics)
+            compute_edge_density = "edge_density" %in% metrics,
+            save_rds = !no_rds)
 
 # ============================================================
 # Step 4: その他特徴量計算 [suffix mode: run_umi_uei が高速化]
 # ============================================================
 cat("\n--- Step 4: Features (suffix mode) ---\n")
 run_features(name, save_path, min_cluster_size, num_cores,
-             metrics = intersect(metrics, c("umi_uei", "ego_size", "diameter")))
+             metrics  = intersect(metrics, c("umi_uei", "ego_size", "diameter")),
+             save_rds = !no_rds)
 
 # ============================================================
 # Step 5: 作図

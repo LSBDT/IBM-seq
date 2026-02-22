@@ -126,6 +126,7 @@ Rscript r_script/00_main.R <name> <read_path> <save_path> [オプション]
 | `--cores=N`         | 1             | 並列計算コア数（72コア/512GBマシンなら `--cores=9` 程度が目安）|
 | `--metrics=A,B,...` | 全指標        | 計算する指標（`edge_density`,`umi_uei`,`ego_size`,`diameter`）|
 | `--from-tsv`        | —             | TSV から図だけ再作成（再計算しない）                          |
+| `--no-rds`          | —             | Step 3/4 の指標 RDS を保存しない（TSV のみ出力）。自動的に `--from-tsv` も有効化。I/O 節約に使用 |
 
 ### 実行例
 
@@ -138,6 +139,9 @@ Rscript r_script/00_main.R V5P2_24aB_CTCF_2 data output --metrics=ego_size,diame
 
 # 計算済み TSV から図だけ作り直す
 Rscript r_script/00_main.R V5P2_24aB_CTCF_2 data output --from-tsv
+
+# RDS 中間ファイル不要・I/O を節約したい場合（TSV と PDF のみ出力）
+Rscript r_script/00_main.R V5P2_24aB_CTCF_2 data output --no-rds 1000 --cores=9
 
 # バックグラウンドで実行（ログをファイルに保存）
 nohup Rscript r_script/00_main.R V5P2_24aB_CTCF_2 data output \
@@ -624,6 +628,25 @@ Louvain アルゴリズムはランダム初期化を使うため、同じデー
 ### Q5. SM モードと標準モードで UMI/UEI 合計が違う
 
 独立してパイプラインを実行した場合、Louvain のランダム性で大クラスターの構成が変わるため、UMI/UEI 合計が異なるのは正常です。同一クラスタリング結果での比較は `sm_bench.R` の `[PASS]/[FAIL]` で確認してください。
+
+### Q7. RDS ファイルを保存せずにパイプラインを実行したい（ストレージ・I/O 節約）
+
+`--no-rds` オプションを使います：
+
+```bash
+Rscript r_script/00_main.R V5P2_24aB_CTCF_2 data output --no-rds 1000 --cores=9
+```
+
+**保存されるファイル（変わらない）：**
+- `_01_graph.rds`, `_02_graph.rds`, `_02_membership.rds`（Step 1/2 の構造 RDS）
+- 全 TSV ファイル（`_03_*.tsv`, `_04_*.tsv`）
+- 全 PDF ファイル（`_05_*.pdf`）
+
+**省略されるファイル（5つ）：**
+- `_03_cluster_size.rds`, `_03_edge_density.rds`
+- `_04_umi_uei.rds`, `_04_ego_size.rds`, `_04_diameter.rds`
+
+TSV さえ残っていれば後から `--from-tsv` で図の再作成が可能です。Step 4 を `--no-rds` の後に単独実行する場合、`_03_cluster_size.rds` がなくても自動的に `.tsv` にフォールバックします。
 
 ### Q6. `_02_membership.rds` に `node_type` 列がない
 

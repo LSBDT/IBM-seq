@@ -23,6 +23,10 @@
 #                      例: --metrics=ego_size,diameter
 #   --from-tsv       : 作図ステップで RDS の代わりに TSV から読み込む
 #                      計算を再実行せずに図だけ作り直す場合に使用
+#   --no-rds         : Step 3/4 の指標 RDS ファイルを保存しない（TSV のみ出力）
+#                      RDS の I/O を省略してパイプラインを高速化したい場合に使用
+#                      ※ Step 1/2 の構造 RDS（graph.rds, membership.rds）は常に保存
+#                      ※ --no-rds 指定時は自動的に --from-tsv が有効になる
 #
 # 使用例:
 #   # 全指標を計算（通常実行）
@@ -65,7 +69,7 @@ min_cluster_size <- 1000L
 num_cores        <- 1L
 metrics          <- c("edge_density", "umi_uei", "ego_size", "diameter")
 from_tsv         <- FALSE
-dedup_after      <- FALSE
+no_rds           <- FALSE
 
 for (a in args[-(1:3)]) {
   if (a %in% c("--no-dup", "--with-dup")) {
@@ -79,6 +83,9 @@ for (a in args[-(1:3)]) {
     metrics <- strsplit(sub("^--metrics=", "", a), ",")[[1]]
   } else if (a == "--from-tsv") {
     from_tsv <- TRUE
+  } else if (a == "--no-rds") {
+    no_rds   <- TRUE
+    from_tsv <- TRUE  # --no-rds では作図も TSV から読む
   } else if (grepl("^[0-9]+$", a)) {
     min_cluster_size <- as.integer(a)
   }
@@ -100,7 +107,8 @@ cat(paste0("  dedup_after      = ", dedup_after,                 "\n"))
 cat(paste0("  min_cluster_size = ", min_cluster_size,            "\n"))
 cat(paste0("  num_cores        = ", num_cores,                   "\n"))
 cat(paste0("  metrics          = ", paste(metrics, collapse=","), "\n"))
-cat(paste0("  from_tsv         = ", from_tsv,                    "\n\n"))
+cat(paste0("  from_tsv         = ", from_tsv,                    "\n"))
+cat(paste0("  no_rds           = ", no_rds,                      "\n\n"))
 
 # ---- ライブラリ読み込み ----
 suppressPackageStartupMessages({
@@ -142,14 +150,16 @@ run_clustering(name, save_path, num_cores = num_cores, dedup_after = dedup_after
 # ============================================================
 cat("\n--- Step 3: Density ---\n")
 run_density(name, save_path, min_cluster_size, num_cores,
-            compute_edge_density = "edge_density" %in% metrics)
+            compute_edge_density = "edge_density" %in% metrics,
+            save_rds = !no_rds)
 
 # ============================================================
 # Step 4: その他特徴量計算
 # ============================================================
 cat("\n--- Step 4: Features ---\n")
 run_features(name, save_path, min_cluster_size, num_cores,
-             metrics = intersect(metrics, c("umi_uei", "ego_size", "diameter")))
+             metrics  = intersect(metrics, c("umi_uei", "ego_size", "diameter")),
+             save_rds = !no_rds)
 
 # ============================================================
 # Step 5: 作図
