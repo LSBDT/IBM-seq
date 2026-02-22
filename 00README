@@ -1,0 +1,36 @@
+# 森岡先生へのIBM-seqのCTCFテストデータ
+
+DIR:/home/kanako.i/morioka_sennsei(d7/d8)
+
+- data
+
+  - V5P2_24aB_CTCF_2_3000.link.gz
+
+    エッジ数3,000（ただし、uniqはしていないので被っている可能性あり）
+
+  - V5P2_24aB_CTCF_2_300.link.gz
+
+    エッジ数300（ただし、uniqはしていないので被っている可能性あり）
+
+  -  V5P2_24aB_CTCF_2.link.gz
+
+    エッジ数2,015,852（元のデータ、ただし、uniqはしていないので被っている可能性あり）
+
+- script
+
+  - IBMseq_notparallel_process_data_ike.R
+
+    link fileからネットワーク読み込みやcommunity計算などを行うscript
+
+```bash
+ #実行方法
+ $Rscript "IBMseq_notparallel_process_data_ike.R" \
+	   "{link fileの”link.gz”前}" \
+	   "{link fileのdir}" "{link fileのdir内にあるoutputがはいるdir}"
+	   
+#実行例
+Rscript "IBMseq_notparallel_process_data_ike.R" \
+	   "V5P2_24aB_CTCF_2_3000" \
+	   "~/morioka_sennsei/data" "~/morioka_sennsei/data/output"
+```
+

@@ -1,0 +1,22 @@
+# ---- 出力・大規模データ（GitHub にはアップロードしない） ----
+data/
+tmp/
+bench_full.log
+
+# ---- 仕様書（非公開） ----
+specification_IBMseq_process.md
+
+# ---- R 中間ファイル ----
+*.rds
+*.RData
+*.Rhistory
+
+# ---- ログ ----
+*_process.log
+*.log
+
+# ---- OS 生成ファイル（macOS / SSHFS リソースフォーク） ----
+.DS_Store
+._.DS_Store
+._*
+.fuse_hidden*
