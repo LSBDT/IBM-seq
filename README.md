@@ -237,8 +237,18 @@ Rscript r_script/04_features.R V5P2_24aB_CTCF_2 output 1000 1 --metrics=umi_uei
 Rscript r_script/05_plot.R <name> <save_path> [--from-tsv]
 ```
 
-- **入力**: Step 3/4 の RDS（または `--from-tsv` 指定時は TSV）
-- **出力**: `{name}_05_cluster_size.pdf`, `{name}_05_edge_density.pdf`, `{name}_05_umi_uei.pdf`, `{name}_05_ego_size.pdf`, `{name}_05_diameter.pdf`
+`save_path` の中にある `{name}` プレフィックスを持つ5種類のファイルを自動で探し、それぞれの PDF を生成します。ファイルが存在しない場合はそのグラフをスキップして次へ進みます（エラーにはなりません）。
+
+| 読み込むファイル              | 生成するPDF                    | グラフ種別                      |
+|-------------------------------|-------------------------------|--------------------------------|
+| `{name}_03_cluster_size.rds`  | `{name}_05_cluster_size.pdf`  | violin + boxplot（対数軸）      |
+| `{name}_03_edge_density.rds`  | `{name}_05_edge_density.pdf`  | violin + boxplot                |
+| `{name}_04_umi_uei.rds`       | `{name}_05_umi_uei.pdf`       | violin + boxplot（対数軸）      |
+| `{name}_04_ego_size.rds`      | `{name}_05_ego_size.pdf`      | density plot（クラスター色分け）|
+| `{name}_04_diameter.rds`      | `{name}_05_diameter.pdf`      | violin + boxplot                |
+
+- `--from-tsv` を付けると `.rds` の代わりに `.tsv` を読み込む（計算をやり直さず図だけ再生成したいとき）
+- 特定の指標だけ図を作りたい場合は、対象の `.rds`/`.tsv` だけ `save_path` に置いておけば、他はスキップされます
 
 ---
 
