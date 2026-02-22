@@ -20,7 +20,8 @@
 #   Rscript 02_clustering.R <name> <save_path>
 # =============================================================================
 
-run_clustering <- function(name, save_path, num_cores = 1L, louvain_min_size = 3L) {
+run_clustering <- function(name, save_path, num_cores = 1L, louvain_min_size = 3L,
+                           dedup_after = FALSE) {
 
   log_file <- file.path(save_path, paste0(name, "_process.log"))
   write_log <- function(msg) {
@@ -30,7 +31,8 @@ run_clustering <- function(name, save_path, num_cores = 1L, louvain_min_size = 3
 
   write_log(paste0("[02_clustering] START: ", Sys.time(),
                    "  num_cores=", num_cores,
-                   "  louvain_min_size=", louvain_min_size))
+                   "  louvain_min_size=", louvain_min_size,
+                   "  dedup_after=", dedup_after))
 
   # ---- Step1 出力を読み込み ----
   graph_file <- file.path(save_path, paste0(name, "_01_graph.rds"))
@@ -114,6 +116,17 @@ run_clustering <- function(name, save_path, num_cores = 1L, louvain_min_size = 3
   }
 
   V(graph)$community_id <- community_id
+
+  # ---- [--dup-then-dedup] クラスタリング後に重複エッジを除去 ----
+  if (dedup_after) {
+    write_log("  [--dup-then-dedup] Simplifying graph after clustering...")
+    graph <- simplify(graph,
+                      remove.multiple = TRUE,
+                      remove.loops    = TRUE,
+                      edge.attr.comb  = "first")
+    write_log(paste0("  Simplified: V=", vcount(graph), "  E=", ecount(graph)))
+  }
+
   gc(verbose = FALSE)
 
   # ---- membership データフレーム構築 ----
@@ -172,16 +185,18 @@ if (!exists("IBMSEQ_SOURCED")) {
   })
 
   args <- commandArgs(trailingOnly = TRUE)
-  if (length(args) < 2) stop("Usage: Rscript 02_clustering.R <name> <save_path> [--cores=N] [--louvain-min=N]")
+  if (length(args) < 2) stop("Usage: Rscript 02_clustering.R <name> <save_path> [--cores=N] [--louvain-min=N] [--dedup-after]")
   name             <- args[1]
   save_path        <- args[2]
   num_cores        <- 1L
   louvain_min_size <- 3L
+  dedup_after      <- FALSE
 
   for (a in args[-(1:2)]) {
     if (grepl("^--cores=[0-9]+$", a))       num_cores        <- as.integer(sub("^--cores=", "", a))
     if (grepl("^--louvain-min=[0-9]+$", a)) louvain_min_size <- as.integer(sub("^--louvain-min=", "", a))
+    if (a == "--dedup-after")               dedup_after      <- TRUE
   }
 
-  run_clustering(name, save_path, num_cores, louvain_min_size)
+  run_clustering(name, save_path, num_cores, louvain_min_size, dedup_after)
 }
