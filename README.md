@@ -1,13 +1,14 @@
 # IBMseq パイプライン
 
-IBM-seq データ（single-cell ゲノム・ネットワーク）からグラフを構築し、Louvain クラスタリングと各種指標（クラスターサイズ・Edge Density・UMI/UEI数・Ego Size・Diameter）を計算する R スクリプト群です。このパッケージでは、IBMseqから生成される膨大なサブグラフをさらにコミュニティ分割を行うことでIBMseq特有のグラフ構造をネットワーク特徴量から調査します。SMモードでは、数万のネットワークを調べる際に、ノード名だけでも計算量の負荷があることから、コミュニティ分割のためのクラスタリングの段階でノード名のサフィックスを整数コードに変換し、`node_type` 列として保存します。
+IBM-seq データからグラフを構築し、Louvain クラスタリングと各種指標（クラスターサイズ・Edge Density・UMI/UEI数・Ego Size・Diameter）を計算する R スクリプト群です。
+このパッケージでは、IBMseqから生成される膨大なサブグラフをさらにコミュニティ分割を行うことで、IBMseq特有のグラフ構造をネットワーク特徴量から調査します。SMモードでは数万のネットワークを調べる際に、ノード名だけでも計算量の負荷があることから、コミュニティ分割のためのクラスタリングの段階で、ノード名のサフィックスを整数コードに変換し`node_type` 列として保存します。
 
 ![Version](https://img.shields.io/badge/version-v0.1.0-blue)
 ![R](https://img.shields.io/badge/R-%3E%3D4.0-informational)
 
 Original scripts are developed by Keisuke Nimura (nimura@gunma-u.ac.jp)
 Last update: 2026-02-22
-Modifier: Masaki Suimye Morioka (mmorioka@dbcls.rois.ac.jp)
+Main modifier: Masaki Suimye Morioka (mmorioka@dbcls.rois.ac.jp)
 
 
 ---
