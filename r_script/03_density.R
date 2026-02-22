@@ -5,18 +5,18 @@
 # Input : {save_path}/{name}_02_graph.rds
 #         {save_path}/{name}_02_membership.rds
 #
-# Output: {save_path}/{name}_03_cluster_size.rds/.tsv
+# Output: {save_path}/{name}_03_cluster_size.rds/.tsv  (--no-rds 時は .tsv のみ)
 #         {save_path}/{name}_03_cluster_size_large.tsv    ← 閾値以上のみ
-#         {save_path}/{name}_03_edge_density.rds/.tsv
+#         {save_path}/{name}_03_edge_density.rds/.tsv  (--no-rds 時は .tsv のみ)
 #         {save_path}/{name}_03_density_summary.txt
 #
 # 使い方（スタンドアロン）:
-#   Rscript 03_density.R <name> <save_path> [min_cluster_size] [num_cores] [--no-edge-density]
-#   デフォルト: min_cluster_size=1000, num_cores=1, edge_density を計算する
+#   Rscript 03_density.R <name> <save_path> [min_cluster_size] [num_cores] [--no-edge-density] [--no-rds]
+#   デフォルト: min_cluster_size=1000, num_cores=1, edge_density を計算する, RDS を保存する
 # =============================================================================
 
 run_density <- function(name, save_path, min_cluster_size = 1000L, num_cores = 1L,
-                        compute_edge_density = TRUE) {
+                        compute_edge_density = TRUE, save_rds = TRUE) {
 
   log_file <- file.path(save_path, paste0(name, "_process.log"))
   write_log <- function(msg) {
@@ -27,7 +27,8 @@ run_density <- function(name, save_path, min_cluster_size = 1000L, num_cores = 1
   write_log(paste0("[03_density] START: ", Sys.time()))
   write_log(paste0("  min_cluster_size=", min_cluster_size,
                    "  num_cores=", num_cores,
-                   "  compute_edge_density=", compute_edge_density))
+                   "  compute_edge_density=", compute_edge_density,
+                   "  save_rds=", save_rds))
 
   # ---- RDS 読み込み ----
   graph        <- readRDS(file.path(save_path, paste0(name, "_02_graph.rds")))
@@ -46,12 +47,14 @@ run_density <- function(name, save_path, min_cluster_size = 1000L, num_cores = 1
   write_log(capture.output(print(membership_sum_large)))
 
   # ---- RDS + テキスト保存 ----
-  saveRDS(membership_sum, file.path(save_path, paste0(name, "_03_cluster_size.rds")))
+  if (save_rds)
+    saveRDS(membership_sum, file.path(save_path, paste0(name, "_03_cluster_size.rds")))
   fwrite(as.data.table(membership_sum),
          file.path(save_path, paste0(name, "_03_cluster_size.tsv")), sep = "\t")
   fwrite(as.data.table(membership_sum_large),
          file.path(save_path, paste0(name, "_03_cluster_size_large.tsv")), sep = "\t")
-  write_log(paste0("  Saved: ", name, "_03_cluster_size.rds/.tsv"))
+  write_log(paste0("  Saved: ", name, "_03_cluster_size",
+                   if (save_rds) ".rds/.tsv" else ".tsv (--no-rds: RDS skipped)"))
 
   # ---- Edge Density 計算（compute_edge_density=TRUE の場合のみ）----
   if (!compute_edge_density) {
@@ -81,10 +84,12 @@ run_density <- function(name, save_path, min_cluster_size = 1000L, num_cores = 1
     )
   }
 
-  saveRDS(edge_density_df, file.path(save_path, paste0(name, "_03_edge_density.rds")))
+  if (save_rds)
+    saveRDS(edge_density_df, file.path(save_path, paste0(name, "_03_edge_density.rds")))
   fwrite(edge_density_df,  file.path(save_path, paste0(name, "_03_edge_density.tsv")), sep = "\t")
   write_log(capture.output(head(edge_density_df)))
-  write_log(paste0("  Saved: ", name, "_03_edge_density.rds/.tsv"))
+  write_log(paste0("  Saved: ", name, "_03_edge_density",
+                   if (save_rds) ".rds/.tsv" else ".tsv (--no-rds: RDS skipped)"))
 
   # ---- サマリーテキスト ----
   summary_out <- file.path(save_path, paste0(name, "_03_density_summary.txt"))
@@ -116,17 +121,20 @@ if (!exists("IBMSEQ_SOURCED")) {
 
   args <- commandArgs(trailingOnly = TRUE)
   if (length(args) < 2) {
-    stop("Usage: Rscript 03_density.R <name> <save_path> [min_cluster_size] [num_cores] [--no-edge-density]")
+    stop("Usage: Rscript 03_density.R <name> <save_path> [min_cluster_size] [num_cores] [--no-edge-density] [--no-rds]")
   }
   name                 <- args[1]
   save_path            <- args[2]
   min_cluster_size     <- 1000L
   num_cores            <- 1L
   compute_edge_density <- TRUE
+  save_rds             <- TRUE
 
   for (a in args[-(1:2)]) {
     if (a == "--no-edge-density") {
       compute_edge_density <- FALSE
+    } else if (a == "--no-rds") {
+      save_rds <- FALSE
     } else if (grepl("^--cores=[0-9]+$", a)) {
       num_cores <- as.integer(sub("^--cores=", "", a))
     } else if (grepl("^[0-9]+$", a) && min_cluster_size == 1000L) {
@@ -136,5 +144,5 @@ if (!exists("IBMSEQ_SOURCED")) {
     }
   }
 
-  run_density(name, save_path, min_cluster_size, num_cores, compute_edge_density)
+  run_density(name, save_path, min_cluster_size, num_cores, compute_edge_density, save_rds)
 }
