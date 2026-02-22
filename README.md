@@ -7,7 +7,8 @@ IBM-seq データ（single-cell ゲノム・ネットワーク）からグラフ
 
 Original scripts are developed by Keisuke Nimura (nimura@gunma-u.ac.jp)
 Last update: 2026-02-22
-Modifier: Masaki Suimye Morioka (mmorioka@dbcls.rois.ac.jp)
+Modifier: Masaki Suimye Morioka (mmorioka@dbcls.rois.ac.jp) and Kanako Ikeuchi (kanako.ikeuchi@riken.jp)
+Maintainer: Takeya Kasukawa (takeya.kasukawa@dbcls.rois.ac.jp)
 
 
 ---
