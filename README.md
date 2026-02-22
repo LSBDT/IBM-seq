@@ -6,9 +6,9 @@ IBM-seq データからグラフを構築し、Louvain クラスタリングと�
 ![Version](https://img.shields.io/badge/version-v0.1.0-blue)
 ![R](https://img.shields.io/badge/R-%3E%3D4.0-informational)
 
-Original scripts are developed by Keisuke Nimura (nimura@gunma-u.ac.jp)
-Last update: 2026-02-22
-Main modifier: Masaki Suimye Morioka (mmorioka@dbcls.rois.ac.jp)
+- Original scripts are developed by Keisuke Nimura (nimura@gunma-u.ac.jp)
+- Last update: 2026-02-22
+- Main modifier: Masaki Suimye Morioka (mmorioka@dbcls.rois.ac.jp)
 
 
 ---
