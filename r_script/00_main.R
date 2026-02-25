@@ -70,6 +70,7 @@ num_cores        <- 1L
 metrics          <- c("edge_density", "umi_uei", "ego_size", "diameter")
 from_tsv         <- FALSE
 no_rds           <- FALSE
+dedup_after      <- FALSE
 
 for (a in args[-(1:3)]) {
   if (a %in% c("--no-dup", "--with-dup")) {
