@@ -18,7 +18,8 @@ r_script/
 ├── 02_clustering.R  Louvainクラスタリング（連結成分ごと）
 ├── 03_density.R     クラスター規模・Edge Density計算
 ├── 04_features.R    UMI/UEI数・Ego Size・Diameter計算
-└── 05_plot.R        作図（PDF出力）
+├── 05_plot.R        作図（PDF出力、単一サンプル）
+└── 06_combine_plot.R  複数サンプルの比較図を一括生成
 ```
 
 各スクリプトは `00_main.R` から呼び出せるほか、単体でも実行できます。
@@ -202,6 +203,60 @@ Rscript 05_plot.R V5P2_24aB_CTCF_2_3000 /output --from-tsv
 
 ---
 
+### 06_combine_plot.R — 複数サンプル比較図
+
+各サンプルを `00_main.R` で個別に処理した後、生成された RDS/TSV を一括で読み込んで
+サンプル間を並べた比較 violin/density plot を生成します。
+
+```
+# 同一ディレクトリ
+Rscript 06_combine_plot.R <rds_dir> <name1,name2,...> [--out=dir] [--prefix=str] [--from-tsv] [--min-size=N]
+
+# 異なるディレクトリ
+Rscript 06_combine_plot.R --out=<out_dir> <dir1>:<name1> [<dir2>:<name2> ...] [--prefix=str] [--from-tsv]
+```
+
+| 入力 (RDS) | `<name>_03_cluster_size.rds`, `<name>_03_edge_density.rds`, `<name>_04_umi_uei.rds`, `<name>_04_ego_size.rds`, `<name>_04_diameter.rds` |
+|-----------|-------------------------------------------------------------------------------------------------------------------------------------------|
+| 出力 | `{prefix}_06_cluster_size.pdf`, `{prefix}_06_edge_density.pdf`, `{prefix}_06_umi_uei.pdf`, `{prefix}_06_ego_size.pdf`, `{prefix}_06_diameter.pdf` |
+
+| オプション | 説明 |
+|------------|------|
+| `--out=path` | 出力ディレクトリ（省略時は `rds_dir`） |
+| `--prefix=str` | 出力ファイルのプレフィックス（デフォルト: `combined`） |
+| `--from-tsv` | RDS の代わりに TSV ファイルから読み込む |
+| `--min-size=N` | cluster_size プロットで使用する最小クラスターサイズ（デフォルト: 0 = 全クラスター）。旧スクリプトの `total > 1000` に相当するには `--min-size=1000` を指定 |
+
+```bash
+# 同じディレクトリに 3 サンプル分の RDS がある場合
+Rscript 06_combine_plot.R /output sampleA,sampleB,sampleC
+
+# 出力先を別ディレクトリ(/output/figs)にし、クラスターサイズの閾値を設定
+Rscript 06_combine_plot.R /output sampleA,sampleB,sampleC \
+  --out=/output/figs --prefix=exp1 --min-size=1000
+
+# 各サンプルが別ディレクトリの場合
+Rscript 06_combine_plot.R --out=/output/combined \
+  /output/rB:V5P2_rB_S2P_1_S1 \
+  /output/6aB:V5P2_6aB_S2P_1_S8 \
+  /output/24aB:V5P2_24aB_S2P_1_S15
+
+# TSV から再作成（計算は再実行しない）
+Rscript 06_combine_plot.R /output sampleA,sampleB,sampleC --from-tsv
+```
+
+#### 各プロットの仕様
+
+| プロット | X 軸 | Y 軸 | 備考 |
+|---------|------|------|------|
+| cluster_size | サンプル名 | ノード数（log10） | `--min-size` で小クラスターを除外可 |
+| edge_density | サンプル名 | Edge Density | 大クラスターのみ（03_density.R の時点で計算済み） |
+| umi_uei | `{サンプル名}_{種類}` | カウント（log10） | x 軸ラベルがサンプル名+種類（UMI1等）になる |
+| ego_size | Ego Size 値（log10） | density | サンプルごとに `facet_wrap` で分割 |
+| diameter | サンプル名 | 直径 | 大クラスターのみ |
+
+---
+
 ## 出力ファイル一覧
 
 | ファイル | 内容 |
@@ -226,6 +281,12 @@ Rscript 05_plot.R V5P2_24aB_CTCF_2_3000 /output --from-tsv
 | `<name>_05_ego_size.pdf` | Ego Size の density plot（クラスター別） |
 | `<name>_05_diameter.pdf` | 直径の violin + boxplot |
 | `<name>_process.log` | 全ステップの処理ログ |
+| `{prefix}_06_cluster_size.pdf` | 複数サンプルのクラスター規模比較 |
+| `{prefix}_06_edge_density.pdf` | 複数サンプルの Edge Density 比較 |
+| `{prefix}_06_umi_uei.pdf` | 複数サンプルの UMI/UEI カウント比較 |
+| `{prefix}_06_ego_size.pdf` | 複数サンプルの Ego Size 比較（facet） |
+| `{prefix}_06_diameter.pdf` | 複数サンプルの直径比較 |
+| `{prefix}_06_combine.log` | 06_combine_plot.R の処理ログ |
 
 ---
 
