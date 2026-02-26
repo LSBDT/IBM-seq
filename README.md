@@ -19,6 +19,8 @@ Modifier: Masaki Suimye Morioka (mmorioka@dbcls.rois.ac.jp)
 3. [スクリプト一覧](#3-スクリプト一覧)
 4. [パイプライン全体の実行](#4-パイプライン全体の実行)
 5. [個別ステップの実行](#5-個別ステップの実行)
+   - [Step 1〜5](#step-1-データ読み込みグラフ構築)
+   - [複数サンプル比較図（06_combine_plot.R）](#複数サンプル比較図06_combine_plotr)
 6. [重複エッジの扱いについて（--no-dup / --with-dup / --dup-then-dedup）](#6-重複エッジの扱いについてno-dup--with-dup--dup-then-dedup)
 7. [SM モード（Suffix Mode）](#7-sm-モードsuffix-mode)
 8. [SM モード：検証・速度比較（sm_bench.R）](#8-sm-モード検証速度比較sm_benchr)
@@ -92,7 +94,8 @@ r_script/
 ├── 03_density.R            # Step 3: クラスターサイズ・Edge Density（共通）
 ├── 04_features.R           # Step 4: UMI/UEI・Ego Size・Diameter（標準）
 ├── sm_04_features.R        # Step 4: 同上・UMI/UEI 高速版（SM）
-├── 05_plot.R               # Step 5: 作図 PDF 出力（共通）
+├── 05_plot.R               # Step 5: 作図 PDF 出力（単一サンプル）
+├── 06_combine_plot.R       # 複数サンプルの比較図を一括生成
 │
 ├── run_orig_metrics.R      # ike.R 互換モード（比較用）
 ├── compare_modes.R         # 3モード比較図の作成
@@ -249,6 +252,59 @@ Rscript r_script/05_plot.R <name> <save_path> [--from-tsv]
 
 - `--from-tsv` を付けると `.rds` の代わりに `.tsv` を読み込む（計算をやり直さず図だけ再生成したいとき）
 - 特定の指標だけ図を作りたい場合は、対象の `.rds`/`.tsv` だけ `save_path` に置いておけば、他はスキップされます
+
+### 複数サンプル比較図（06_combine_plot.R）
+
+各サンプルを `00_main.R` で個別に処理した後、複数サンプルの RDS を一括読み込みして比較 violin/density plot を生成します。サンプル名はファイル名から取得され、指定した順に図へ並びます。
+
+#### 書式
+
+```bash
+# 同一ディレクトリに複数サンプルの RDS がある場合
+Rscript r_script/06_combine_plot.R <rds_dir> <name1,name2,...> [オプション]
+
+# サンプルごとにディレクトリが異なる場合
+Rscript r_script/06_combine_plot.R --out=<out_dir> <dir1>:<name1> [<dir2>:<name2> ...]
+```
+
+#### オプション
+
+| オプション | デフォルト | 説明 |
+|------------|-----------|------|
+| `--out=path` | `rds_dir` | 出力ディレクトリ |
+| `--prefix=str` | `combined` | 出力ファイルのプレフィックス |
+| `--from-tsv` | — | RDS の代わりに TSV から読み込む |
+| `--min-size=N` | `0`（全クラスター） | cluster_size プロットの最小クラスターサイズ |
+
+#### 実行例
+
+```bash
+# 同じディレクトリの 3 サンプルを比較
+Rscript r_script/06_combine_plot.R /output sampleA,sampleB,sampleC
+
+# 出力先・プレフィックスを指定し、小クラスターを除外
+Rscript r_script/06_combine_plot.R /output sampleA,sampleB,sampleC \
+  --out=/output/figs --prefix=exp1 --min-size=1000
+
+# サンプルが別ディレクトリにある場合
+Rscript r_script/06_combine_plot.R --out=/output/combined \
+  /output/rB:V5P2_rB_S2P_1_S1 \
+  /output/6aB:V5P2_6aB_S2P_1_S8 \
+  /output/24aB:V5P2_24aB_S2P_1_S15
+```
+
+#### 生成されるファイル
+
+| ファイル | 内容 |
+|---------|------|
+| `{prefix}_06_cluster_size.pdf` | クラスターサイズ violin+boxplot（サンプル比較） |
+| `{prefix}_06_edge_density.pdf` | Edge Density violin+boxplot（サンプル比較） |
+| `{prefix}_06_umi_uei.pdf` | UMI/UEI violin+boxplot（`{サンプル名}_{種類}` x 軸） |
+| `{prefix}_06_ego_size.pdf` | Ego Size density plot（サンプルごとに facet） |
+| `{prefix}_06_diameter.pdf` | Diameter violin+boxplot（サンプル比較） |
+| `{prefix}_06_combine.log` | 処理ログ |
+
+> **入力ファイルの命名規則**: `{name}_03_cluster_size.rds` など `00_main.R` が生成するファイル名と一致するため、実行後にそのまま `06_combine_plot.R` へ渡せます。対応する RDS（または TSV）が存在しない指標はスキップされます。
 
 ---
 
@@ -609,11 +665,17 @@ ls tmp/sm_bench.pdf tmp/comparison.pdf
 | `{name}_04_ego_size.rds/.tsv`             | 4        | RDS/TSV      | Ego Size（order=3）                |
 | `{name}_04_diameter.rds/.tsv`             | 4        | RDS/TSV      | Diameter                           |
 | `{name}_04_features_summary.txt`          | 4        | テキスト     | 特徴量計算サマリー                 |
-| `{name}_05_cluster_size.pdf`              | 5        | PDF          | クラスターサイズ violin+boxplot     |
-| `{name}_05_edge_density.pdf`              | 5        | PDF          | Edge Density violin+boxplot        |
-| `{name}_05_umi_uei.pdf`                   | 5        | PDF          | UMI/UEI violin+boxplot（type別）   |
-| `{name}_05_ego_size.pdf`                  | 5        | PDF          | Ego Size 密度プロット              |
-| `{name}_05_diameter.pdf`                  | 5        | PDF          | Diameter violin+boxplot            |
+| `{name}_05_cluster_size.pdf`              | 5        | PDF          | クラスターサイズ violin+boxplot（単一サンプル）|
+| `{name}_05_edge_density.pdf`              | 5        | PDF          | Edge Density violin+boxplot（単一サンプル）|
+| `{name}_05_umi_uei.pdf`                   | 5        | PDF          | UMI/UEI violin+boxplot（単一サンプル）|
+| `{name}_05_ego_size.pdf`                  | 5        | PDF          | Ego Size 密度プロット（単一サンプル）|
+| `{name}_05_diameter.pdf`                  | 5        | PDF          | Diameter violin+boxplot（単一サンプル）|
+| `{prefix}_06_cluster_size.pdf`            | 6        | PDF          | クラスターサイズ比較（複数サンプル）|
+| `{prefix}_06_edge_density.pdf`            | 6        | PDF          | Edge Density 比較（複数サンプル）  |
+| `{prefix}_06_umi_uei.pdf`                 | 6        | PDF          | UMI/UEI 比較（複数サンプル）       |
+| `{prefix}_06_ego_size.pdf`                | 6        | PDF          | Ego Size 比較（複数サンプル・facet）|
+| `{prefix}_06_diameter.pdf`                | 6        | PDF          | Diameter 比較（複数サンプル）      |
+| `{prefix}_06_combine.log`                 | 6        | テキスト     | 06_combine_plot.R 処理ログ        |
 
 ---
 
