@@ -1,12 +1,19 @@
 # IBMseq パイプライン
 
-IBM-seq データ（single-cell ゲノム・ネットワーク）からグラフを構築し、Louvain クラスタリングと各種指標（クラスターサイズ・Edge Density・UMI/UEI数・Ego Size・Diameter）を計算する R スクリプト群です。このパッケージでは、IBMseqから生成される膨大なサブグラフをさらにコミュニティ分割を行うことでIBMseq特有のグラフ構造をネットワーク特徴量から調査します。SMモードでは、数万のネットワークを調べる際に、ノード名だけでも計算量の負荷があることから、コミュニティ分割のためのクラスタリングの段階でノード名のサフィックスを整数コードに変換し、`node_type` 列として保存します。
+IBM-seq データ（single-cell ゲノム・ネットワーク）からグラフを構築し、Louvain クラスタリングと各種指標（クラスターサイズ・Edge Density・UMI/UEI数・Ego Size・Diameter）を計算する R スクリプト群です。このパッケージでは、IBMseqから生成される膨大なサブグラフをさらにコミュニティ分割を行うことでIBMseq特有のグラフ構造をネットワーク特徴量から調査します。
+
+**データ対応:**
+- **Single データ**: 単一抗体のデータ（例: CTCF のみ）
+- **Mix データ**: 複数抗体を同時に解析したデータ（例: CTCF, H3K27ac, H3K4me1, S2P など）
+- どちらのデータ形式も同じコマンドで実行可能
+
+SMモードでは、数万のネットワークを調べる際に、ノード名だけでも計算量の負荷があることから、コミュニティ分割のためのクラスタリングの段階でノード名のサフィックスを整数コードに変換し、`node_type` 列として保存します。
 
 ![Version](https://img.shields.io/badge/version-v0.1.0-blue)
 ![R](https://img.shields.io/badge/R-%3E%3D4.0-informational)
 
 Original scripts are developed by Keisuke Nimura (nimura@gunma-u.ac.jp)
-Last update: 2026-02-22
+Last update: 2026-03-05
 Modifier: Masaki Suimye Morioka (mmorioka@dbcls.rois.ac.jp)
 
 
@@ -68,7 +75,28 @@ install.packages(c("data.table", "igraph", "ggplot2"))
 | 4      | Target2 | to ノードのターゲット属性                 |
 | 5      | count   | リード数                                  |
 
-ノード名のサフィックス（suffix mode で使用）：
+### Single データと Mix データの違い
+
+**Single データ（単一抗体）の例:**
+```
+AAAAAAAAACAAAATATTAGC.CTCF.t1    ACGACGCCATGTGAGAGA.e1    CTCF.t1    UEI1    1
+ACGACGCCATGTGAGAGA.e1            CCCGTTTCATGTTAGTCC.e2    UEI1       UEI2    1
+```
+- Target 列に単一の抗体（例: `CTCF.t1`, `CTCF.t2`）と `UEI1`, `UEI2` のみ
+- 処理後の membership テーブルは約 4-6 列の Target 属性
+
+**Mix データ（複数抗体）の例:**
+```
+AAAAAAAAAAAGTATTCGGTC.S2P.t1     GATCGGAGATGATTAGCG.e1    S2P.t1       UEI1    1
+AAAAAAAAACAAAAATCGTCG.H3K4me1.t1 ACTAGAGCATGTGGGAGT.e1    H3K4me1.t1   UEI1    1
+```
+- Target 列に複数の抗体（例: `CTCF.t1`, `H3K27ac.t1`, `H3K4me1.t1`, `S2P.t1` など）
+- 抗体数は 4-6 種類程度（データにより異なる）
+- 処理後の membership テーブルは自動的に抗体数に応じて列数が拡張される（例: 5 抗体 → 12 列）
+
+パイプラインは `data.table::dcast()` による横持ち変換を使用しているため、**抗体数に関わらず自動対応**します。
+
+### ノード名のサフィックス（suffix mode で使用）
 
 | サフィックス | ノードタイプ | 意味                  |
 |--------------|--------------|-----------------------|
@@ -134,8 +162,11 @@ Rscript r_script/00_main.R <name> <read_path> <save_path> [オプション]
 ### 実行例
 
 ```bash
-# 通常実行（全指標、重複エッジ除去、9コア）
+# Single データ実行（全指標、重複エッジ除去、9コア）
 Rscript r_script/00_main.R V5P2_24aB_CTCF_2 data output --no-dup 1000 --cores=9
+
+# Mix データ実行（複数抗体データも同じコマンド）
+Rscript r_script/00_main.R V5P2_24aB_mix_2 data output --no-dup 1000 --cores=9
 
 # 一部の指標だけ計算（ego_size と diameter）
 Rscript r_script/00_main.R V5P2_24aB_CTCF_2 data output --metrics=ego_size,diameter
@@ -157,7 +188,11 @@ tail -f output/V5P2_24aB_CTCF_2_process.log
 ### SM モードでの全体実行
 
 ```bash
+# Single データ（SM モード）
 Rscript r_script/sm_00_main.R V5P2_24aB_CTCF_2 data output --no-dup 1000 --cores=9
+
+# Mix データ（SM モード・複数抗体データも同じコマンド）
+Rscript r_script/sm_00_main.R V5P2_24aB_mix_2 data output --no-dup 1000 --cores=9
 ```
 
 オプションは `00_main.R` と同じです。UMI/UEI の計算がより高速になります（詳細は [セクション 7](#7-sm-モードsuffix-mode)）。
@@ -538,9 +573,10 @@ Rscript r_script/compare_modes.R \
 
 ```bash
 ls data/
-# V5P2_24aB_CTCF_2_3000.link.gz  （エッジ3,000件：テスト用）
-# V5P2_24aB_CTCF_2_300.link.gz   （エッジ300件：超小テスト用）
-# V5P2_24aB_CTCF_2.link.gz       （本番データ）
+# V5P2_24aB_CTCF_2_3000.link.gz    （Single・エッジ3,000件：テスト用）
+# V5P2_24aB_CTCF_2_300.link.gz     （Single・エッジ300件：超小テスト用）
+# V5P2_24aB_mix_2_3000.link.gz     （Mix・エッジ3,000件：テスト用）
+# V5P2_24aB_CTCF_2.link.gz         （Single・本番データ）
 ```
 
 ### Step 1: 標準モードのテスト
@@ -590,7 +626,28 @@ Rscript -e "
 "
 ```
 
-### Step 3: SM モード検証（sm_bench.R）
+### Step 3: Mix データのテスト
+
+```bash
+# 標準モード（Mix データ）
+mkdir -p tmp/test_mix
+Rscript r_script/00_main.R V5P2_24aB_mix_2_3000 data tmp/test_mix --no-dup 3 --cores=1
+
+# SM モード（Mix データ）
+mkdir -p tmp/test_mix_sm
+Rscript r_script/sm_00_main.R V5P2_24aB_mix_2_3000 data tmp/test_mix_sm --no-dup 3 --cores=1
+
+# Mix データの membership 構造を確認（抗体数に応じて列数が自動拡張される）
+Rscript -e "
+  dt <- readRDS('tmp/test_mix/V5P2_24aB_mix_2_3000_02_membership.rds')
+  cat('Columns:', paste(names(dt), collapse=', '), '\n')
+  cat('Rows:', nrow(dt), '\n')
+"
+```
+
+Mix データでは、Target 列が複数の抗体に対応して自動的に拡張されます（例: 5 抗体 → 12 列）。
+
+### Step 4: SM モード検証（sm_bench.R）
 
 ```bash
 Rscript r_script/sm_bench.R V5P2_24aB_CTCF_2_3000 tmp/test_sm 3 5 tmp/sm_bench.pdf
@@ -598,7 +655,7 @@ Rscript r_script/sm_bench.R V5P2_24aB_CTCF_2_3000 tmp/test_sm 3 5 tmp/sm_bench.p
 
 `[PASS]` が表示され、`tmp/sm_bench.pdf` が生成されることを確認します。
 
-### Step 4: ike.R 互換モードの実行とモード比較
+### Step 6: ike.R 互換モードの実行とモード比較
 
 ```bash
 # ike.R 互換モード実行
@@ -615,7 +672,7 @@ Rscript r_script/compare_modes.R \
   3
 ```
 
-### Step 5: 一括テストスクリプト
+### Step 7: 一括テストスクリプト
 
 以下のシェルコマンドで上記テストを一括実行できます：
 
