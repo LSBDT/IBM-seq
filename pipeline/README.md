@@ -12,9 +12,10 @@ SMモードでは、数万のネットワークを調べる際に、ノード名
 ![Version](https://img.shields.io/badge/version-v0.1.0-blue)
 ![R](https://img.shields.io/badge/R-%3E%3D4.0-informational)
 
-Original scripts are developed by Keisuke Nimura (nimura@gunma-u.ac.jp)
-Last update: 2026-03-05
-Modifier: Masaki Suimye Morioka (mmorioka@dbcls.rois.ac.jp)
+- Original scripts are developed by Keisuke Nimura (nimura@gunma-u.ac.jp)
+- Last update: 2026-03-06
+- Main modifier: Masaki Suimye Morioka (mmorioka@dbcls.rois.ac.jp)
+- Modifier: Kanako Ikeuchi (kanako.ikeuchi@riken.jp)
 
 
 ---
@@ -30,11 +31,10 @@ Modifier: Masaki Suimye Morioka (mmorioka@dbcls.rois.ac.jp)
    - [複数サンプル比較図（06_combine_plot.R）](#複数サンプル比較図06_combine_plotr)
 6. [重複エッジの扱いについて（--no-dup / --with-dup / --dup-then-dedup）](#6-重複エッジの扱いについてno-dup--with-dup--dup-then-dedup)
 7. [SM モード（Suffix Mode）](#7-sm-モードsuffix-mode)
-8. [SM モード：検証・速度比較（sm_bench.R）](#8-sm-モード検証速度比較sm_benchr)
-9. [3モード比較（compare_modes.R）](#9-3モード比較compare_modesr)
-10. [テスト方法](#10-テスト方法)
-11. [出力ファイル一覧](#11-出力ファイル一覧)
-12. [よくある質問とトラブルシューティング](#12-よくある質問とトラブルシューティング)
+8. [開発・検証用スクリプト](#8-開発検証用スクリプト)
+9. [テスト方法](#9-テスト方法)
+10. [出力ファイル一覧](#10-出力ファイル一覧)
+11. [よくある質問とトラブルシューティング](#11-よくある質問とトラブルシューティング)
 
 ---
 
@@ -91,7 +91,7 @@ AAAAAAAAAAAGTATTCGGTC.S2P.t1     GATCGGAGATGATTAGCG.e1    S2P.t1       UEI1    1
 AAAAAAAAACAAAAATCGTCG.H3K4me1.t1 ACTAGAGCATGTGGGAGT.e1    H3K4me1.t1   UEI1    1
 ```
 - Target 列に複数の抗体（例: `CTCF.t1`, `H3K27ac.t1`, `H3K4me1.t1`, `S2P.t1` など）
-- 抗体数は 4-6 種類程度（データにより異なる）
+- 抗体数は 4-6 種類程度（データにより異なる。現在の Mix データでは 5 種類）
 - 処理後の membership テーブルは自動的に抗体数に応じて列数が拡張される（例: 5 抗体 → 12 列）
 
 パイプラインは `data.table::dcast()` による横持ち変換を使用しているため、**抗体数に関わらず自動対応**します。
@@ -111,7 +111,7 @@ AAAAAAAAACAAAAATCGTCG.H3K4me1.t1 ACTAGAGCATGTGGGAGT.e1    H3K4me1.t1   UEI1    1
 
 ```
 r_script/
-├── install_packages.R      # パッケージインストーラー
+├── install_packages.R      # パッケージインストーラ
 │
 ├── 00_main.R               # パイプライン実行（標準モード）
 ├── sm_00_main.R            # パイプライン実行（SM モード）
@@ -125,10 +125,7 @@ r_script/
 ├── 05_plot.R               # Step 5: 作図 PDF 出力（単一サンプル）
 ├── 06_combine_plot.R       # 複数サンプルの比較図を一括生成
 │
-├── run_orig_metrics.R         # ike.R 互換モード（比較用）
-├── compare_modes.R            # 3モード比較図の作成
-├── test_compare_dup_modes.R   # --no-dup vs --dup-then-dedup の比較検証
-└── sm_bench.R                 # SM モード検証・速度比較
+└── run_orig_metrics.R         # ike.R 互換モード（比較用）
 ```
 
 ---
@@ -380,7 +377,9 @@ Rscript r_script/00_main.R <name> <read_path> <save_path> --with-dup 1000
 - 旧スクリプト `ike.R` と同じ挙動
 - **Edge Density の値が実際より大きくなる可能性あり**（重複エッジが分子に加算されるため）
 
-### --dup-then-dedup（クラスタリング後に重複除去）
+### --dup-then-dedup（クラスタリングの後に重複除去するモード）  
+
+本来、Louveinは重複があっても重みとして内部で扱い、コミュニティ検出の計算をしている（開発者へ問い合わせたため間違いない）。従って、多重辺が存在した状態でもLouveinは間違った計算はしていないが、その後のクラスタリング済みデータを使って密度計算などを行う際は、多重辺などの辺数を加えた重複を込みの数で算出してしまう。これをクラスタリング後のデータにおいて解消するために、クラスタリング後に重複を除去して正当な辺数を用いるためにこのオプションを用意している。
 
 ```bash
 Rscript r_script/00_main.R <name> <read_path> <save_path> --dup-then-dedup 1000
@@ -411,59 +410,7 @@ Rscript r_script/00_main.R <name> <read_path> <save_path> --dup-then-dedup 1000
 | Ego Size         | 重複なしグラフで計算   | 重複ありグラフで計算   | 重複なしグラフで計算   |
 | Diameter         | 重複なしグラフで計算   | 重複ありグラフで計算   | 重複なしグラフで計算   |
 
-### モード比較のための検証スクリプト
-
-`--no-dup` と `--dup-then-dedup` のクラスター数・サイズ分布を比較する検証スクリプトを用意しています：
-
-```bash
-Rscript r_script/test_compare_dup_modes.R <name> <data_dir> <out_base> [min_cluster_size]
-```
-
-**このスクリプトの重要性：**
-- **重複エッジの扱いは Louvain クラスタリングの結果に影響を与えます**
-- `--no-dup` と `--dup-then-dedup` では検出されるクラスター数が異なる場合があります
-- 特に重複エッジが多いデータでは、この差が顕著になります
-
-**スクリプトが実行する処理：**
-
-1. 同じデータに対して `--no-dup` と `--dup-then-dedup` の両方を実行
-2. クラスター数・クラスターサイズ分布を比較
-3. 5種類のグラフと数値サマリーを出力：
-   - クラスター総数の棒グラフ
-   - 閾値以上のクラスター数の棒グラフ
-   - クラスターサイズ分布（violin + boxplot）
-   - クラスターサイズの累積分布（ECDF）
-   - サイズビンごとのクラスター数ヒストグラム
-
-**出力ファイル：**
-```
-{out_base}/
-├── nodup/                           # --no-dup モードの中間ファイル
-├── dup/                             # --dup-then-dedup モードの中間ファイル
-├── compare_dup_modes.pdf            # 比較グラフ（5ページ）
-└── compare_dup_modes_summary.tsv    # 数値サマリー
-```
-
-**数値サマリーの例：**
-```
-mode              n_clusters  n_clusters_large  median_size  mean_size  max_size  total_nodes
---no-dup          2422        32                1            1.5        7         3718
---dup-then-dedup  2450        35                1            1.5        8         3718
-```
-
-**実行例：**
-```bash
-Rscript r_script/test_compare_dup_modes.R \
-  V5P2_24aB_CTCF_2_3000 \
-  data \
-  data/output_compare_dup \
-  3
-```
-
-**注意事項：**
-- Louvain アルゴリズムは確率的なため、実行ごとにクラスター数は若干変動します
-- 重要なのは個々の数値ではなく、**分布全体の傾向の違い**です
-- 重複エッジが多いほど、`--dup-then-dedup` の方がクラスター数が多くなる傾向があります
+> **モード比較の検証**: `--no-dup` と `--dup-then-dedup` の違いを比較する検証スクリプトについては [dev/README.md](dev/README.md#1-test_compare_dup_modesr) を参照してください。
 
 ---
 
@@ -537,102 +484,23 @@ SM モード:  name | Target1 | ... | subgraph_id | community_id | node_type
 
 ---
 
-## 8. SM モード：検証・速度比較（sm_bench.R）
+## 8. 開発・検証用スクリプト
 
-SM モードが標準モードと同じ結果を返すことを確認するベンチマークスクリプトです。
+パイプラインの動作検証・性能比較・元スクリプトとの差分情報は `dev/` ディレクトリにまとめています：
 
-### 重要な設計方針
+- **`dev/validation/`**: 検証スクリプト
+  - `test_compare_dup_modes.R`: `--no-dup` vs `--dup-then-dedup` の比較
+  - `sm_bench.R`: SM モードの正確性検証・速度比較
+  - `compare_modes.R`: 3モード（original/modified/sm）の指標比較
+- **`dev/old_script/`**: 開発の参考にした元スクリプト
+- **`dev/difference.md`**: 元スクリプトとの差分まとめ
+- **`dev/specification_IBMseq_mix.md`**: Mix データ仕様書
 
-Louvain クラスタリングはランダム性を持つため、**異なるパイプライン実行で比較すると UMI/UEI の合計が必ず変わります**（バグではなく正常動作）。
-`sm_bench.R` では **同一のクラスタリング結果（`_02_membership.rds`）** を両実装で共有し、正確な正確性検証を行います。
-
-### 実行方法
-
-```bash
-Rscript r_script/sm_bench.R <name> <sm_save> [min_cluster_size] [n_reps] [out_pdf]
-```
-
-| 引数               | デフォルト                             | 説明                        |
-|--------------------|----------------------------------------|-----------------------------|
-| `<name>`           | —                                      | サンプル名                  |
-| `<sm_save>`        | —                                      | SM パイプラインの出力ディレクトリ |
-| `[min_cluster_size]`| 1000                                  | 大クラスター判定の閾値       |
-| `[n_reps]`         | 5                                      | 速度計測の繰り返し回数       |
-| `[out_pdf]`        | `{sm_save}/{name}_sm_bench.pdf`        | 出力 PDF のパス              |
-
-```bash
-# 例
-Rscript r_script/sm_bench.R V5P2_24aB_CTCF_2_3000 output/sm 1000 10 results/sm_bench.pdf
-```
-
-### 出力（PDF 内容）
-
-| ページ | 内容                                           |
-|--------|------------------------------------------------|
-| 表紙   | PASS/FAIL 結果・Speedup・パラメーター          |
-| 1      | UMI/UEI 分布比較（orig vs sfx、violin + boxplot）|
-| 1b     | UMI/UEI 合計カウント棒グラフ（完全一致確認）  |
-| 2      | Cluster Size 分布（violin + boxplot）          |
-| 3      | Edge Density 分布（violin + boxplot）          |
-| 4      | Ego Size 密度プロット（クラスターごとに色分け）|
-| 5      | Diameter 分布（violin + boxplot）              |
-
-### 正確性チェックの判定基準
-
-```
-[PASS]: type ごとの UMI/UEI 合計が orig と sfx で完全一致
-[FAIL]: 1つでも合計が異なる
-```
+詳細は [dev/README.md](dev/README.md) を参照してください。
 
 ---
 
-## 9. 3モード比較（compare_modes.R）
-
-original（ike.R 互換）・modified（00_main.R）・sm_modified（sm_00_main.R）の 3 モードの指標分布を比較します。
-
-### ike.R 互換モードの実行
-
-```bash
-Rscript r_script/run_orig_metrics.R <name> <read_path> <save_path> [min_cluster_size] [num_cores]
-
-# 例
-Rscript r_script/run_orig_metrics.R V5P2_24aB_CTCF_2_3000 data output/orig 3 1
-```
-
-`run_orig_metrics.R` は旧スクリプト `ike.R` と同じ処理（`simplify()` なし・逐次 Louvain）を再現し、各指標の TSV を出力します。
-
-### 3モード比較図の作成
-
-```bash
-Rscript r_script/compare_modes.R <name> <orig_dir> <mod_dir> <sm_dir> <out_pdf> [min_cluster_size]
-
-# 例
-Rscript r_script/compare_modes.R \
-  V5P2_24aB_CTCF_2_3000 \
-  output/orig \
-  output/modified \
-  output/sm \
-  results/comparison.pdf \
-  1000
-```
-
-| 引数          | 説明                             |
-|---------------|----------------------------------|
-| `<orig_dir>`  | run_orig_metrics.R の出力ディレクトリ |
-| `<mod_dir>`   | 00_main.R の出力ディレクトリ     |
-| `<sm_dir>`    | sm_00_main.R の出力ディレクトリ  |
-| `<out_pdf>`   | 出力 PDF パス                     |
-
-### 出力
-
-- `{out_pdf}`: 5 指標の比較 violin/boxplot（PDF）
-- `{out_pdf}.summary.tsv`: 中央値・平均・件数の数値サマリー
-
-> **注意**: Louvain はランダム初期化のため、3モードの独立実行ではクラスター割り当てが異なります。比較は分布形状と合計カウントで行います。
-
----
-
-## 10. テスト方法
+## 9. テスト方法
 
 本番データで実行する前に、小さいデータでパイプライン全体が正常に動作するか確認する方法を示します。
 
@@ -770,7 +638,7 @@ ls tmp/sm_bench.pdf tmp/comparison.pdf
 
 ---
 
-## 11. 出力ファイル一覧
+## 10. 出力ファイル一覧
 
 | ファイル                                  | ステップ | 形式         | 説明                               |
 |-------------------------------------------|----------|--------------|------------------------------------|
@@ -806,7 +674,7 @@ ls tmp/sm_bench.pdf tmp/comparison.pdf
 
 ---
 
-## 12. よくある質問とトラブルシューティング
+## 11. よくある質問とトラブルシューティング
 
 ### Q1. Louvain を実行してもクラスター割り当てが毎回変わるのはなぜ？
 
