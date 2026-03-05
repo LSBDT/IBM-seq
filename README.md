@@ -58,12 +58,12 @@ Rscript pipeline/r_script/sm_00_main.R <sample_name> <data_dir> <output_dir> --n
 - R (>= 4.0)
 - 必要なパッケージ: `data.table`, `igraph`, `ggplot2`, `parallel`
 
-## 貢献者
+## Contributor
 
 - **Original scripts**: Keisuke Nimura (nimura@gunma-u.ac.jp)
-- **Modifier**: Masaki Suimye Morioka (mmorioka@dbcls.rois.ac.jp)
-
-Last update: 2026-03-05
+- **Main Modifier**: Masaki Suimye Morioka (mmorioka@dbcls.rois.ac.jp)
+- **Modifier**: Kanako Ikeuchi (kanako.ikeuchi@riken.jp) 
+Last update: 2026-03-06
 
 ## ライセンス
 
