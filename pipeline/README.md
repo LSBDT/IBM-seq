@@ -275,15 +275,22 @@ Rscript r_script/04_features.R V5P2_24aB_CTCF_2 output 1000 1 --metrics=umi_uei
 Rscript r_script/05_plot.R <name> <save_path> [--from-tsv]
 ```
 
-`save_path` の中にある `{name}` プレフィックスを持つ5種類のファイルを自動で探し、それぞれの PDF を生成します。ファイルが存在しない場合はそのグラフをスキップして次へ進みます（エラーにはなりません）。
+`save_path` の中にある `{name}` プレフィックスを持つファイルを自動で探し、それぞれの PDF を生成します。ファイルが存在しない場合はそのグラフをスキップして次へ進みます（エラーにはなりません）。
 
-| 読み込むファイル              | 生成するPDF                    | グラフ種別                      |
-|-------------------------------|-------------------------------|--------------------------------|
-| `{name}_03_cluster_size.rds`  | `{name}_05_cluster_size.pdf`  | violin + boxplot（対数軸）      |
-| `{name}_03_edge_density.rds`  | `{name}_05_edge_density.pdf`  | violin + boxplot                |
-| `{name}_04_umi_uei.rds`       | `{name}_05_umi_uei.pdf`       | violin + boxplot（対数軸）      |
-| `{name}_04_ego_size.rds`      | `{name}_05_ego_size.pdf`      | density plot（クラスター色分け）|
-| `{name}_04_diameter.rds`      | `{name}_05_diameter.pdf`      | violin + boxplot                |
+| 読み込むファイル              | 生成するPDF                         | グラフ種別                      |
+|-------------------------------|-------------------------------------|--------------------------------|
+| `{name}_03_cluster_size.rds`  | `{name}_05_cluster_size.pdf`        | violin + boxplot（対数軸）      |
+| `{name}_03_edge_density.rds`  | `{name}_05_edge_density.pdf`        | violin + boxplot                |
+| `{name}_04_umi_uei.rds`       | `{name}_05_umi_uei.pdf`             | violin + boxplot（対数軸）      |
+| `{name}_04_ego_size.rds`      | `{name}_05_ego_size.pdf`            | density plot（クラスター色分け）|
+| `{name}_04_diameter.rds`      | `{name}_05_diameter.pdf`            | violin + boxplot                |
+| `{name}_02_membership.rds`    | `{name}_05_antibody_counts.pdf`     | **抗体別カウント** (Mix のみ)   |
+
+**Mix データ専用の追加出力:**
+- `{name}_05_antibody_counts.pdf`: 各抗体のクラスターごとカウント (violin + boxplot、対数軸)
+- `{name}_05_antibody_counts.tsv`: 抗体別カウントのデータテーブル
+- membership から抗体列を自動検出し、抗体数に関わらず対応（4種類でも5種類でも動作）
+- Single データの場合はスキップされます
 
 - `--from-tsv` を付けると `.rds` の代わりに `.tsv` を読み込む（計算をやり直さず図だけ再生成したいとき）
 - 特定の指標だけ図を作りたい場合は、対象の `.rds`/`.tsv` だけ `save_path` に置いておけば、他はスキップされます
@@ -335,9 +342,14 @@ Rscript r_script/06_combine_plot.R --out=/output/combined \
 | `{prefix}_06_cluster_size.pdf` | クラスターサイズ violin+boxplot（サンプル比較） |
 | `{prefix}_06_edge_density.pdf` | Edge Density violin+boxplot（サンプル比較） |
 | `{prefix}_06_umi_uei.pdf` | UMI/UEI violin+boxplot（`{サンプル名}_{種類}` x 軸） |
-| `{prefix}_06_ego_size.pdf` | Ego Size density plot（サンプルごとに facet） |
+| `{prefix}_06_ego_size.pdf` | Ego Size density plot（サンプルごとに facet、1ページ） |
+| `{prefix}_06_ego_size_multipage.pdf` | **Ego Size density plot（マルチページ、各サンプル1ページ）** |
 | `{prefix}_06_diameter.pdf` | Diameter violin+boxplot（サンプル比較） |
 | `{prefix}_06_combine.log` | 処理ログ |
+
+**Ego Size の 2 種類の PDF:**
+- `ego_size.pdf`: 全サンプルを facet で1ページに並べて表示（一覧性重視）
+- `ego_size_multipage.pdf`: 各サンプルを1ページずつ表示（元スクリプト 10.1.mix.r スタイル、ページめくりで比較）
 
 > **入力ファイルの命名規則**: `{name}_03_cluster_size.rds` など `00_main.R` が生成するファイル名と一致するため、実行後にそのまま `06_combine_plot.R` へ渡せます。対応する RDS（または TSV）が存在しない指標はスキップされます。
 
@@ -727,10 +739,13 @@ ls tmp/sm_bench.pdf tmp/comparison.pdf
 | `{name}_05_umi_uei.pdf`                   | 5        | PDF          | UMI/UEI violin+boxplot（単一サンプル）|
 | `{name}_05_ego_size.pdf`                  | 5        | PDF          | Ego Size 密度プロット（単一サンプル）|
 | `{name}_05_diameter.pdf`                  | 5        | PDF          | Diameter violin+boxplot（単一サンプル）|
+| `{name}_05_antibody_counts.pdf`           | 5        | PDF          | **抗体別カウント violin+boxplot（Mix のみ）** |
+| `{name}_05_antibody_counts.tsv`           | 5        | TSV          | **抗体別カウントデータ（Mix のみ）** |
 | `{prefix}_06_cluster_size.pdf`            | 6        | PDF          | クラスターサイズ比較（複数サンプル）|
 | `{prefix}_06_edge_density.pdf`            | 6        | PDF          | Edge Density 比較（複数サンプル）  |
 | `{prefix}_06_umi_uei.pdf`                 | 6        | PDF          | UMI/UEI 比較（複数サンプル）       |
 | `{prefix}_06_ego_size.pdf`                | 6        | PDF          | Ego Size 比較（複数サンプル・facet）|
+| `{prefix}_06_ego_size_multipage.pdf`      | 6        | PDF          | **Ego Size 比較（マルチページ、各サンプル1ページ）** |
 | `{prefix}_06_diameter.pdf`                | 6        | PDF          | Diameter 比較（複数サンプル）      |
 | `{prefix}_06_combine.log`                 | 6        | テキスト     | 06_combine_plot.R 処理ログ        |
 
