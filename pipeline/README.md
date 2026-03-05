@@ -91,9 +91,10 @@ AAAAAAAAAAAGTATTCGGTC.S2P.t1     GATCGGAGATGATTAGCG.e1    S2P.t1       UEI1    1
 AAAAAAAAACAAAAATCGTCG.H3K4me1.t1 ACTAGAGCATGTGGGAGT.e1    H3K4me1.t1   UEI1    1
 ```
 - Target 列に複数の抗体（例: `CTCF.t1`, `H3K27ac.t1`, `H3K4me1.t1`, `S2P.t1` など）
-- 抗体数は Mixの場合 5
+- 抗体数は 4-6 種類程度（データにより異なる。現在の Mix データでは 5 種類）
 - 処理後の membership テーブルは自動的に抗体数に応じて列数が拡張される（例: 5 抗体 → 12 列）
-  - パイプラインは `data.table::dcast()` による横持ち変換を使用しているため、**抗体数に関わらず自動対応**します。
+
+パイプラインは `data.table::dcast()` による横持ち変換を使用しているため、**抗体数に関わらず自動対応**します。
 
 ### ノード名のサフィックス（suffix mode で使用）
 
@@ -185,8 +186,12 @@ tail -f output/V5P2_24aB_CTCF_2_process.log
 ### SM モードでの全体実行
 
 ```bash
-# SingleとMix データ共通（SM モード）
+# Single データ（SM モード）
 Rscript r_script/sm_00_main.R V5P2_24aB_CTCF_2 data output --no-dup 1000 --cores=9
+
+# Mix データ（SM モード・複数抗体データも同じコマンド）
+Rscript r_script/sm_00_main.R V5P2_24aB_mix_2 data output --no-dup 1000 --cores=9
+```
 
 オプションは `00_main.R` と同じです。UMI/UEI の計算がより高速になります（詳細は [セクション 7](#7-sm-モードsuffix-mode)）。
 
