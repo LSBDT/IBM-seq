@@ -125,9 +125,10 @@ r_script/
 ├── 05_plot.R               # Step 5: 作図 PDF 出力（単一サンプル）
 ├── 06_combine_plot.R       # 複数サンプルの比較図を一括生成
 │
-├── run_orig_metrics.R      # ike.R 互換モード（比較用）
-├── compare_modes.R         # 3モード比較図の作成
-└── sm_bench.R              # SM モード検証・速度比較
+├── run_orig_metrics.R         # ike.R 互換モード（比較用）
+├── compare_modes.R            # 3モード比較図の作成
+├── test_compare_dup_modes.R   # --no-dup vs --dup-then-dedup の比較検証
+└── sm_bench.R                 # SM モード検証・速度比較
 ```
 
 ---
@@ -409,6 +410,60 @@ Rscript r_script/00_main.R <name> <read_path> <save_path> --dup-then-dedup 1000
 | UMI/UEI カウント | ほぼ同じ               | ほぼ同じ               | ほぼ同じ               |
 | Ego Size         | 重複なしグラフで計算   | 重複ありグラフで計算   | 重複なしグラフで計算   |
 | Diameter         | 重複なしグラフで計算   | 重複ありグラフで計算   | 重複なしグラフで計算   |
+
+### モード比較のための検証スクリプト
+
+`--no-dup` と `--dup-then-dedup` のクラスター数・サイズ分布を比較する検証スクリプトを用意しています：
+
+```bash
+Rscript r_script/test_compare_dup_modes.R <name> <data_dir> <out_base> [min_cluster_size]
+```
+
+**このスクリプトの重要性：**
+- **重複エッジの扱いは Louvain クラスタリングの結果に影響を与えます**
+- `--no-dup` と `--dup-then-dedup` では検出されるクラスター数が異なる場合があります
+- 特に重複エッジが多いデータでは、この差が顕著になります
+
+**スクリプトが実行する処理：**
+
+1. 同じデータに対して `--no-dup` と `--dup-then-dedup` の両方を実行
+2. クラスター数・クラスターサイズ分布を比較
+3. 5種類のグラフと数値サマリーを出力：
+   - クラスター総数の棒グラフ
+   - 閾値以上のクラスター数の棒グラフ
+   - クラスターサイズ分布（violin + boxplot）
+   - クラスターサイズの累積分布（ECDF）
+   - サイズビンごとのクラスター数ヒストグラム
+
+**出力ファイル：**
+```
+{out_base}/
+├── nodup/                           # --no-dup モードの中間ファイル
+├── dup/                             # --dup-then-dedup モードの中間ファイル
+├── compare_dup_modes.pdf            # 比較グラフ（5ページ）
+└── compare_dup_modes_summary.tsv    # 数値サマリー
+```
+
+**数値サマリーの例：**
+```
+mode              n_clusters  n_clusters_large  median_size  mean_size  max_size  total_nodes
+--no-dup          2422        32                1            1.5        7         3718
+--dup-then-dedup  2450        35                1            1.5        8         3718
+```
+
+**実行例：**
+```bash
+Rscript r_script/test_compare_dup_modes.R \
+  V5P2_24aB_CTCF_2_3000 \
+  data \
+  data/output_compare_dup \
+  3
+```
+
+**注意事項：**
+- Louvain アルゴリズムは確率的なため、実行ごとにクラスター数は若干変動します
+- 重要なのは個々の数値ではなく、**分布全体の傾向の違い**です
+- 重複エッジが多いほど、`--dup-then-dedup` の方がクラスター数が多くなる傾向があります
 
 ---
 
