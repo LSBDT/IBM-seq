@@ -178,6 +178,25 @@ run_combine_plots <- function(entries, out_dir, prefix = "combined",
         scale_x_log10(limits = c(x_lo, x_hi)) +
         my_plot2
       save_pdf(p, "ego_size", pdf_width = max(7, 4 * n))
+
+      # 元スクリプト(10.1.mix.r)スタイル: マルチページPDF（各サンプル1ページ）
+      # 1つのPDFに全サンプルをページごとに出力（比較しやすい）
+      out_multipage <- file.path(out_dir, paste0(prefix, "_06_ego_size_multipage.pdf"))
+      pdf(out_multipage)
+      for (lib in names_ordered) {
+        es_sub <- es[library == lib]
+        if (nrow(es_sub) > 0) {
+          p_page <- ggplot(es_sub, aes(x = value)) +
+            geom_density(aes(color = as.factor(community_id)), show.legend = FALSE) +
+            labs(x = paste0(lib, "_egoSize")) +
+            scale_x_log10(limits = c(x_lo, x_hi)) +
+            ylim(c(0.0, 2.0)) +
+            my_plot2
+          print(p_page)
+        }
+      }
+      dev.off()
+      write_log(paste0("  Saved: ", basename(out_multipage), " (multipage style)"))
     } else {
       write_log("  SKIP ego_size: no positive values to plot")
     }
