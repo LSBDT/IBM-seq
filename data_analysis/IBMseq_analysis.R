@@ -1,9 +1,5 @@
-library(ggplot2)
-library(dplyr)
-library(tibble)
 library(igraph)
-library(tidyr)
-
+library(dplyr)
 ##update 2026/03/04
 
 #############################
