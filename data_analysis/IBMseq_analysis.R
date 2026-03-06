@@ -76,4 +76,90 @@ count_subgraphs_by_threshold <- function(df, start, end, by) {
   }) %>%
     dplyr::bind_rows()
 }
+
+
+cycle_rank_per_community <- function(graph, membership, threshold) {
+  membership_cut <- membership %>%
+    count(community_id) %>%
+    filter(n > threshold) %>%
+    select(community_id) %>%
+    inner_join(membership, by = "community_id") %>%
+    select(subgraph_id, community_id)
   
+  res_list <- lapply(unique(membership_cut$community_id), function(i) {
+    sub_id <- membership_cut %>%
+      filter(community_id == i) %>%
+      distinct(subgraph_id) %>%
+      pull(subgraph_id)
+    
+    vid <- V(graph)[V(graph)$community_id == i]
+    n_nodes <- length(vid)
+    
+    subgraph <- induced_subgraph(graph, vids = vid)
+    
+    m_edge <- ecount(subgraph)
+    c_comp <- components(subgraph)$no
+    cycle_rank <- m_edge - n_nodes + c_comp
+    
+    data.frame(
+      subgraph_id = if (length(sub_id) > 0) sub_id[1] else NA,
+      community_id = i,
+      n_nodes = n_nodes,
+      edge_count = m_edge,
+      n_components = c_comp,
+      cycle_rank = cycle_rank
+    )
+  })
+  
+  bind_rows(res_list)
+}
+
+tree_likeness_per_community <- function(graph, membership, threshold) {
+  
+  membership_cut <- membership %>%
+    count(community_id) %>%
+    filter(n > threshold) %>%
+    select(community_id) %>%
+    inner_join(membership, by = "community_id") %>%
+    select(subgraph_id, community_id)
+  
+  res_list <- lapply(unique(membership_cut$community_id), function(i) {
+    
+    sub_id <- membership_cut %>%
+      filter(community_id == i) %>%
+      distinct(subgraph_id) %>%
+      pull(subgraph_id)
+    
+    vid <- V(graph)[V(graph)$community_id == i]
+    n_nodes <- length(vid)
+    
+    subgraph <- induced_subgraph(graph, vids = vid) %>%
+      simplify(remove.multiple = TRUE, remove.loops = TRUE)
+    
+    c_comp <- components(subgraph)$no
+    
+    if (c_comp > 1) {
+      density <- NA_real_
+      tree_theoretical_density <- NA_real_
+      ratio <- NA_real_
+    } else {
+      density <- edge_density(subgraph)
+      tree_theoretical_density <- if (n_nodes > 0) 2 / n_nodes else NA_real_
+      ratio <- tree_theoretical_density / density
+    }
+    
+    data.frame(
+      subgraph_id = dplyr::first(sub_id, default = NA),
+      community_id = i,
+      n_nodes = n_nodes,
+      n_components = c_comp,
+      density = density,
+      tree_theoretical_density = tree_theoretical_density,
+      tree_likeness_ratio = ratio
+    )
+  })
+  
+  bind_rows(res_list)
+}
+
+
