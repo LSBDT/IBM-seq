@@ -169,8 +169,8 @@ run_combine_plots <- function(entries, out_dir, prefix = "combined",
     es[, library := factor(library, levels = names_ordered)]
     pos_vals <- es$value[es$value > 0]
     if (length(pos_vals) > 0) {
-      x_lo <- floor(log10(max(1, min(pos_vals)))) |> (\(e) 10^e)()
-      x_hi <- ceiling(log10(max(pos_vals) * 2))   |> (\(e) 10^e)()
+      x_lo <- 10^floor(log10(max(1, min(pos_vals))))
+      x_hi <- 10^ceiling(log10(max(pos_vals) * 2))
       p <- ggplot(es, aes(x = value)) +
         geom_density(aes(color = as.factor(community_id)), show.legend = FALSE) +
         facet_wrap(~ library, ncol = n) +
