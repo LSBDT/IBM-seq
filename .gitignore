@@ -5,6 +5,7 @@ bench_full.log
 
 # ---- 仕様書（非公開） ----
 specification_IBMseq_process.md
+pipeline/00README
 
 # ---- R 中間ファイル ----
 *.rds

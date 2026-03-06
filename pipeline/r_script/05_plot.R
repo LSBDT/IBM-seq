@@ -146,6 +146,75 @@ run_plots <- function(name, save_path, from_tsv = FALSE) {
     write_log(paste0("  Saved: ", basename(pdf_out)))
   }
 
+  # ============================================================
+  # 6. 抗体別カウント（Mix データのみ）
+  # ============================================================
+  # membership から抗体列を抽出し、クラスターごとに抗体別の合計値を集計
+  membership_file <- file.path(save_path, paste0(name, "_02_membership.rds"))
+  if (file.exists(membership_file)) {
+    write_log("  Checking for antibody columns (Mix data)...")
+    membership <- readRDS(membership_file)
+
+    # 除外する列（抗体以外のメタデータ列）
+    exclude_cols <- c("name", "UEI1", "UEI2", "subgraph_id", "community_id", "node_type")
+    all_cols <- names(membership)
+    antibody_cols <- setdiff(all_cols, exclude_cols)
+
+    # 抗体列が存在するかチェック（Mix データの場合のみ）
+    if (length(antibody_cols) > 0) {
+      write_log(paste0("  Found ", length(antibody_cols), " antibody columns: ",
+                       paste(head(antibody_cols, 5), collapse = ", "),
+                       if (length(antibody_cols) > 5) "..." else ""))
+
+      # 抗体名を抽出（.t1, .t2 を除去してグループ化）
+      # 例: CTCF.t1, CTCF.t2 → CTCF
+      antibody_names <- unique(gsub("\\.(t1|t2|m1)$", "", antibody_cols))
+
+      # 各クラスターごとに抗体別の合計を集計
+      antibody_counts_list <- lapply(antibody_names, function(ab) {
+        # この抗体に関連する列（例: CTCF.t1, CTCF.t2）
+        ab_cols <- grep(paste0("^", ab, "\\.(t1|t2|m1)$"), antibody_cols, value = TRUE)
+        if (length(ab_cols) == 0) return(NULL)
+
+        # クラスターごとに合計
+        membership_dt <- as.data.table(membership)
+        agg <- membership_dt[, .(count = sum(.SD, na.rm = TRUE)),
+                             by = community_id,
+                             .SDcols = ab_cols]
+        agg[, antibody := ab]
+        agg[, library := name]
+        agg[count > 0]  # カウント0のクラスターは除外
+      })
+
+      antibody_counts <- rbindlist(antibody_counts_list[!sapply(antibody_counts_list, is.null)])
+
+      if (!is.null(antibody_counts) && nrow(antibody_counts) > 0) {
+        write_log(paste0("  Aggregated antibody counts: ", nrow(antibody_counts), " rows"))
+
+        # violin + boxplot（抗体別）
+        p <- ggplot(antibody_counts, aes(x = antibody, y = count)) +
+          geom_violin() +
+          geom_boxplot(width = 0.1, notch = (nrow(antibody_counts) > 5)) +
+          labs(x = "Antibody", y = "Count per Cluster") +
+          scale_y_log10() +
+          my_plot2
+
+        pdf_out <- file.path(save_path, paste0(name, "_05_antibody_counts.pdf"))
+        pdf(pdf_out); print(p); dev.off()
+        write_log(paste0("  Saved: ", basename(pdf_out)))
+
+        # TSV出力（オプション）
+        tsv_out <- file.path(save_path, paste0(name, "_05_antibody_counts.tsv"))
+        fwrite(antibody_counts, tsv_out, sep = "\t")
+        write_log(paste0("  Saved: ", basename(tsv_out)))
+      } else {
+        write_log("  No antibody counts to plot (all zero)")
+      }
+    } else {
+      write_log("  No antibody columns found (Single data, skipping antibody plot)")
+    }
+  }
+
   write_log(paste0("[05_plot] DONE: ", Sys.time()))
 }
 
