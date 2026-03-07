@@ -17,9 +17,9 @@
 #   {name}_04_features_summary.txt (run_features のみ)
 #
 # 使い方（スタンドアロン）:
-#   Rscript 04_features.R <name> <save_path> [min_cluster_size] [num_cores] [--metrics=A,B,...] [--no-rds]
+#   Rscript 04_features.R <name> <save_path> [min_cluster_size] [num_cores] [--metrics=A,B,...] [--no-rds] [--no-tsv]
 #   有効な指標名: umi_uei, ego_size, diameter
-#   デフォルト: 全指標, min_cluster_size=1000, num_cores=1, RDS を保存する
+#   デフォルト: 全指標, min_cluster_size=1000, num_cores=1, RDS を保存する, TSV を保存する
 #
 # 個別指標だけ実行する例:
 #   Rscript 04_features.R V5P2_24aB_CTCF_2_3000 ./output 1000 4 --metrics=ego_size
@@ -52,7 +52,7 @@
 # run_umi_uei(): UMI/UEI 数カウント
 # =============================================================================
 run_umi_uei <- function(name, save_path, min_cluster_size = 1000L, num_cores = 1L,
-                        save_rds = TRUE) {
+                        save_rds = TRUE, save_tsv = TRUE) {
 
   log_file <- file.path(save_path, paste0(name, "_process.log"))
   write_log <- function(msg) {
@@ -68,7 +68,7 @@ run_umi_uei <- function(name, save_path, min_cluster_size = 1000L, num_cores = 1
     write_log(paste0("  WARNING: No clusters with > ", min_cluster_size, " nodes. Skipped."))
     empty <- data.table(community_id=integer(), variation=integer(), type=character())
     if (save_rds) saveRDS(empty, file.path(save_path, paste0(name, "_04_umi_uei.rds")))
-    fwrite(empty,  file.path(save_path, paste0(name, "_04_umi_uei.tsv")), sep="\t")
+    if (save_tsv) fwrite(empty,  file.path(save_path, paste0(name, "_04_umi_uei.tsv")), sep="\t")
     write_log(paste0("[04_umi_uei] DONE (skipped): ", Sys.time()))
     return(invisible(empty))
   }
@@ -100,10 +100,11 @@ run_umi_uei <- function(name, save_path, min_cluster_size = 1000L, num_cores = 1
   }
 
   if (save_rds) saveRDS(umi_uei_df, file.path(save_path, paste0(name, "_04_umi_uei.rds")))
-  fwrite(umi_uei_df,  file.path(save_path, paste0(name, "_04_umi_uei.tsv")), sep="\t")
+  if (save_tsv) fwrite(umi_uei_df,  file.path(save_path, paste0(name, "_04_umi_uei.tsv")), sep="\t")
   write_log(capture.output(head(umi_uei_df)))
-  write_log(paste0("  Saved: ", name, "_04_umi_uei",
-                   if (save_rds) ".rds/.tsv" else ".tsv (--no-rds: RDS skipped)"))
+  saved_formats <- c(if (save_rds) "RDS", if (save_tsv) "TSV")
+  write_log(paste0("  Saved: ", name, "_04_umi_uei [",
+                   paste(saved_formats, collapse = ", "), "]"))
   write_log(paste0("[04_umi_uei] DONE: ", Sys.time()))
 
   invisible(umi_uei_df)
@@ -113,7 +114,7 @@ run_umi_uei <- function(name, save_path, min_cluster_size = 1000L, num_cores = 1
 # run_ego_size(): Ego Size 計算（order=3）
 # =============================================================================
 run_ego_size <- function(name, save_path, min_cluster_size = 1000L, num_cores = 1L,
-                         save_rds = TRUE) {
+                         save_rds = TRUE, save_tsv = TRUE) {
 
   log_file <- file.path(save_path, paste0(name, "_process.log"))
   write_log <- function(msg) {
@@ -129,7 +130,7 @@ run_ego_size <- function(name, save_path, min_cluster_size = 1000L, num_cores = 
     write_log(paste0("  WARNING: No clusters with > ", min_cluster_size, " nodes. Skipped."))
     empty <- data.table(value=numeric(), community_id=character())
     if (save_rds) saveRDS(empty, file.path(save_path, paste0(name, "_04_ego_size.rds")))
-    fwrite(empty,  file.path(save_path, paste0(name, "_04_ego_size.tsv")), sep="\t")
+    if (save_tsv) fwrite(empty,  file.path(save_path, paste0(name, "_04_ego_size.tsv")), sep="\t")
     write_log(paste0("[04_ego_size] DONE (skipped): ", Sys.time()))
     return(invisible(empty))
   }
@@ -147,10 +148,11 @@ run_ego_size <- function(name, save_path, min_cluster_size = 1000L, num_cores = 
   rm(ego_list); gc(verbose = FALSE)
 
   if (save_rds) saveRDS(ego_size_df, file.path(save_path, paste0(name, "_04_ego_size.rds")))
-  fwrite(ego_size_df,  file.path(save_path, paste0(name, "_04_ego_size.tsv")), sep="\t")
+  if (save_tsv) fwrite(ego_size_df,  file.path(save_path, paste0(name, "_04_ego_size.tsv")), sep="\t")
   write_log(capture.output(head(ego_size_df)))
-  write_log(paste0("  Saved: ", name, "_04_ego_size",
-                   if (save_rds) ".rds/.tsv" else ".tsv (--no-rds: RDS skipped)"))
+  saved_formats <- c(if (save_rds) "RDS", if (save_tsv) "TSV")
+  write_log(paste0("  Saved: ", name, "_04_ego_size [",
+                   paste(saved_formats, collapse = ", "), "]"))
   write_log(paste0("[04_ego_size] DONE: ", Sys.time()))
 
   invisible(ego_size_df)
@@ -160,7 +162,7 @@ run_ego_size <- function(name, save_path, min_cluster_size = 1000L, num_cores = 
 # run_diameter(): Diameter 計算
 # =============================================================================
 run_diameter <- function(name, save_path, min_cluster_size = 1000L, num_cores = 1L,
-                         save_rds = TRUE) {
+                         save_rds = TRUE, save_tsv = TRUE) {
 
   log_file <- file.path(save_path, paste0(name, "_process.log"))
   write_log <- function(msg) {
@@ -176,7 +178,7 @@ run_diameter <- function(name, save_path, min_cluster_size = 1000L, num_cores = 
     write_log(paste0("  WARNING: No clusters with > ", min_cluster_size, " nodes. Skipped."))
     empty <- data.table(diameter=numeric(), community_id=integer(), library=character())
     if (save_rds) saveRDS(empty, file.path(save_path, paste0(name, "_04_diameter.rds")))
-    fwrite(empty,  file.path(save_path, paste0(name, "_04_diameter.tsv")), sep="\t")
+    if (save_tsv) fwrite(empty,  file.path(save_path, paste0(name, "_04_diameter.tsv")), sep="\t")
     write_log(paste0("[04_diameter] DONE (skipped): ", Sys.time()))
     return(invisible(empty))
   }
@@ -195,10 +197,11 @@ run_diameter <- function(name, save_path, min_cluster_size = 1000L, num_cores = 
   diameter_df <- rbindlist(diam_list)
 
   if (save_rds) saveRDS(diameter_df, file.path(save_path, paste0(name, "_04_diameter.rds")))
-  fwrite(diameter_df,  file.path(save_path, paste0(name, "_04_diameter.tsv")), sep="\t")
+  if (save_tsv) fwrite(diameter_df,  file.path(save_path, paste0(name, "_04_diameter.tsv")), sep="\t")
   write_log(capture.output(head(diameter_df)))
-  write_log(paste0("  Saved: ", name, "_04_diameter",
-                   if (save_rds) ".rds/.tsv" else ".tsv (--no-rds: RDS skipped)"))
+  saved_formats <- c(if (save_rds) "RDS", if (save_tsv) "TSV")
+  write_log(paste0("  Saved: ", name, "_04_diameter [",
+                   paste(saved_formats, collapse = ", "), "]"))
   write_log(paste0("[04_diameter] DONE: ", Sys.time()))
 
   invisible(diameter_df)
@@ -209,7 +212,7 @@ run_diameter <- function(name, save_path, min_cluster_size = 1000L, num_cores = 
 # =============================================================================
 run_features <- function(name, save_path, min_cluster_size = 1000L, num_cores = 1L,
                           metrics = c("umi_uei", "ego_size", "diameter"),
-                          save_rds = TRUE) {
+                          save_rds = TRUE, save_tsv = TRUE) {
 
   log_file <- file.path(save_path, paste0(name, "_process.log"))
   write_log <- function(msg) {
@@ -220,9 +223,9 @@ run_features <- function(name, save_path, min_cluster_size = 1000L, num_cores = 
   write_log(paste0("[04_features] START: ", Sys.time(),
                    "  metrics=", paste(metrics, collapse=",")))
 
-  if ("umi_uei"  %in% metrics) run_umi_uei( name, save_path, min_cluster_size, num_cores, save_rds)
-  if ("ego_size" %in% metrics) run_ego_size(name, save_path, min_cluster_size, num_cores, save_rds)
-  if ("diameter" %in% metrics) run_diameter(name, save_path, min_cluster_size, num_cores, save_rds)
+  if ("umi_uei"  %in% metrics) run_umi_uei( name, save_path, min_cluster_size, num_cores, save_rds, save_tsv)
+  if ("ego_size" %in% metrics) run_ego_size(name, save_path, min_cluster_size, num_cores, save_rds, save_tsv)
+  if ("diameter" %in% metrics) run_diameter(name, save_path, min_cluster_size, num_cores, save_rds, save_tsv)
 
   # サマリーテキスト（RDS がなければ TSV から読む）
   summary_out <- file.path(save_path, paste0(name, "_04_features_summary.txt"))
@@ -269,6 +272,7 @@ if (!exists("IBMSEQ_SOURCED")) {
   num_cores        <- 1L
   metrics          <- c("umi_uei", "ego_size", "diameter")
   save_rds         <- TRUE
+  save_tsv         <- TRUE
 
   for (a in args[-(1:2)]) {
     if (grepl("^--metrics=", a)) {
@@ -277,6 +281,8 @@ if (!exists("IBMSEQ_SOURCED")) {
       num_cores <- as.integer(sub("^--cores=", "", a))
     } else if (a == "--no-rds") {
       save_rds <- FALSE
+    } else if (a == "--no-tsv") {
+      save_tsv <- FALSE
     } else if (grepl("^[0-9]+$", a) && min_cluster_size == 1000L) {
       min_cluster_size <- as.integer(a)
     } else if (grepl("^[0-9]+$", a)) {
@@ -284,5 +290,5 @@ if (!exists("IBMSEQ_SOURCED")) {
     }
   }
 
-  run_features(name, save_path, min_cluster_size, num_cores, metrics, save_rds)
+  run_features(name, save_path, min_cluster_size, num_cores, metrics, save_rds, save_tsv)
 }
