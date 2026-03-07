@@ -174,6 +174,9 @@ Rscript r_script/00_main.R V5P2_24aB_CTCF_2 data output --from-tsv
 # RDS 中間ファイル不要・I/O を節約したい場合（TSV と PDF のみ出力）
 Rscript r_script/00_main.R V5P2_24aB_CTCF_2 data output --no-rds 1000 --cores=9
 
+# Ego Size プロットの x軸範囲を変更
+Rscript r_script/00_main.R V5P2_24aB_CTCF_2 data output --ego-xlim=4,1000
+
 # バックグラウンドで実行（ログをファイルに保存）
 nohup Rscript r_script/00_main.R V5P2_24aB_CTCF_2 data output \
   --no-dup 1000 --cores=9 > output/run.log 2>&1 &
@@ -318,8 +321,13 @@ Rscript r_script/04_features.R V5P2_24aB_CTCF_2 output 1000 4 --no-rds
 ### Step 5: 作図
 
 ```bash
-Rscript r_script/05_plot.R <name> <save_path> [--from-tsv]
+Rscript r_script/05_plot.R <name> <save_path> [--from-tsv] [--ego-xlim=min,max]
 ```
+
+| オプション         | デフォルト | 説明                                              |
+|--------------------|------------|---------------------------------------------------|
+| `--from-tsv`       | —          | RDS の代わりに TSV を読み込む                     |
+| `--ego-xlim=min,max` | 4,2000   | Ego Size プロットの x軸範囲（例: `--ego-xlim=4,1000`）|
 
 `save_path` の中にある `{name}` プレフィックスを持つファイルを自動で探し、それぞれの PDF を生成します。ファイルが存在しない場合はそのグラフをスキップして次へ進みます（エラーにはなりません）。
 

@@ -17,13 +17,15 @@
 #   {save_path}/{name}_05_diameter.pdf
 #
 # 使い方（スタンドアロン）:
-#   Rscript 05_plot.R <name> <save_path> [--from-tsv]
+#   Rscript 05_plot.R <name> <save_path> [--from-tsv] [--ego-xlim=min,max]
 #
 #   --from-tsv: RDS の代わりに TSV ファイルから読み込む
 #               計算ステップを再実行せずに図だけ作り直す場合に使用
+#   --ego-xlim=min,max: Ego Size プロットの x軸範囲（デフォルト: 4,2000）
+#                       例: --ego-xlim=4,1000
 # =============================================================================
 
-run_plots <- function(name, save_path, from_tsv = FALSE) {
+run_plots <- function(name, save_path, from_tsv = FALSE, ego_xlim = c(4, 2000)) {
 
   log_file <- file.path(save_path, paste0(name, "_process.log"))
   write_log <- function(msg) {
@@ -123,12 +125,12 @@ run_plots <- function(name, save_path, from_tsv = FALSE) {
     p <- ggplot(es, aes(x = value)) +
       geom_density(aes(color = community_id), show.legend = FALSE) +
       labs(x = paste0(name, "_egoSize")) +
-      scale_x_log10(limits = c(4, 2000)) +
+      scale_x_log10(limits = ego_xlim) +
       ylim(c(0.0, 2.0)) +
       my_plot2
     pdf_out <- file.path(save_path, paste0(name, "_05_ego_size.pdf"))
     pdf(pdf_out); print(p); dev.off()
-    write_log(paste0("  Saved: ", basename(pdf_out)))
+    write_log(paste0("  Saved: ", basename(pdf_out), " (xlim=", paste(ego_xlim, collapse=","), ")"))
   }
 
   # ============================================================
@@ -229,11 +231,24 @@ if (!exists("IBMSEQ_SOURCED")) {
 
   args <- commandArgs(trailingOnly = TRUE)
   if (length(args) < 2) {
-    stop("Usage: Rscript 05_plot.R <name> <save_path> [--from-tsv]")
+    stop("Usage: Rscript 05_plot.R <name> <save_path> [--from-tsv] [--ego-xlim=min,max]")
   }
   name      <- args[1]
   save_path <- args[2]
   from_tsv  <- "--from-tsv" %in% args
+  ego_xlim  <- c(4, 2000)  # デフォルト
 
-  run_plots(name, save_path, from_tsv)
+  # --ego-xlim=min,max オプション解析
+  for (a in args[-(1:2)]) {
+    if (grepl("^--ego-xlim=", a)) {
+      vals <- as.numeric(strsplit(sub("^--ego-xlim=", "", a), ",")[[1]])
+      if (length(vals) == 2 && all(!is.na(vals))) {
+        ego_xlim <- vals
+      } else {
+        stop("--ego-xlim requires two numeric values: --ego-xlim=min,max")
+      }
+    }
+  }
+
+  run_plots(name, save_path, from_tsv, ego_xlim)
 }
