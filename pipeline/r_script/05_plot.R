@@ -17,15 +17,18 @@
 #   {save_path}/{name}_05_diameter.pdf
 #
 # 使い方（スタンドアロン）:
-#   Rscript 05_plot.R <name> <save_path> [--from-tsv] [--ego-xlim=min,max]
+#   Rscript 05_plot.R <name> <save_path> [--from-tsv] [--ego-xlim=min,max] [--rds-dir=path]
 #
 #   --from-tsv: RDS の代わりに TSV ファイルから読み込む
 #               計算ステップを再実行せずに図だけ作り直す場合に使用
 #   --ego-xlim=min,max: Ego Size プロットの x軸範囲（デフォルト: 4,2000）
 #                       例: --ego-xlim=4,1000
+#   --rds-dir=path: RDS/TSVファイルの読み込み元ディレクトリ（デフォルト: save_path）
+#                   PDFは引き続き save_path へ出力される
+#                   例: --rds-dir=. で現在ディレクトリから読み込み
 # =============================================================================
 
-run_plots <- function(name, save_path, from_tsv = FALSE, ego_xlim = c(4, 2000)) {
+run_plots <- function(name, save_path, from_tsv = FALSE, ego_xlim = c(4, 2000), rds_dir = NULL) {
 
   log_file <- file.path(save_path, paste0(name, "_process.log"))
   write_log <- function(msg) {
@@ -33,8 +36,12 @@ run_plots <- function(name, save_path, from_tsv = FALSE, ego_xlim = c(4, 2000)) 
     cat(paste0(msg, "\n"))
   }
 
+  # rds_dir が未指定の場合は save_path を使用（既存動作）
+  if (is.null(rds_dir)) rds_dir <- save_path
+
   write_log(paste0("[05_plot] START: ", Sys.time(),
-                   "  from_tsv=", from_tsv))
+                   "  from_tsv=", from_tsv,
+                   "  rds_dir=", rds_dir))
 
   # ---- テーマ設定 ----
   my_plot2 <- theme_bw() +
@@ -53,14 +60,14 @@ run_plots <- function(name, save_path, from_tsv = FALSE, ego_xlim = c(4, 2000)) 
   # ---- Helper: RDS または TSV を存在確認付きで読み込む ----
   load_data <- function(stem) {
     if (from_tsv) {
-      path <- file.path(save_path, paste0(name, "_", stem, ".tsv"))
+      path <- file.path(rds_dir, paste0(name, "_", stem, ".tsv"))
       if (!file.exists(path)) {
         write_log(paste0("  SKIP (TSV not found): ", basename(path)))
         return(NULL)
       }
       fread(path)
     } else {
-      path <- file.path(save_path, paste0(name, "_", stem, ".rds"))
+      path <- file.path(rds_dir, paste0(name, "_", stem, ".rds"))
       if (!file.exists(path)) {
         write_log(paste0("  SKIP (RDS not found): ", basename(path)))
         return(NULL)
@@ -152,10 +159,18 @@ run_plots <- function(name, save_path, from_tsv = FALSE, ego_xlim = c(4, 2000)) 
   # 6. 抗体別カウント（Mix データのみ）
   # ============================================================
   # membership から抗体列を抽出し、クラスターごとに抗体別の合計値を集計
-  membership_file <- file.path(save_path, paste0(name, "_02_membership.rds"))
+  membership_file <- if (from_tsv) {
+    file.path(rds_dir, paste0(name, "_02_membership.tsv"))
+  } else {
+    file.path(rds_dir, paste0(name, "_02_membership.rds"))
+  }
   if (file.exists(membership_file)) {
     write_log("  Checking for antibody columns (Mix data)...")
-    membership <- readRDS(membership_file)
+    membership <- if (from_tsv) {
+      fread(membership_file)
+    } else {
+      readRDS(membership_file)
+    }
 
     # 除外する列（抗体以外のメタデータ列）
     exclude_cols <- c("name", "UEI1", "UEI2", "subgraph_id", "community_id", "node_type")
@@ -231,14 +246,15 @@ if (!exists("IBMSEQ_SOURCED")) {
 
   args <- commandArgs(trailingOnly = TRUE)
   if (length(args) < 2) {
-    stop("Usage: Rscript 05_plot.R <name> <save_path> [--from-tsv] [--ego-xlim=min,max]")
+    stop("Usage: Rscript 05_plot.R <name> <save_path> [--from-tsv] [--ego-xlim=min,max] [--rds-dir=path]")
   }
   name      <- args[1]
   save_path <- args[2]
   from_tsv  <- "--from-tsv" %in% args
   ego_xlim  <- c(4, 2000)  # デフォルト
+  rds_dir   <- NULL        # デフォルト（save_path と同じ）
 
-  # --ego-xlim=min,max オプション解析
+  # オプション解析
   for (a in args[-(1:2)]) {
     if (grepl("^--ego-xlim=", a)) {
       vals <- as.numeric(strsplit(sub("^--ego-xlim=", "", a), ",")[[1]])
@@ -247,8 +263,10 @@ if (!exists("IBMSEQ_SOURCED")) {
       } else {
         stop("--ego-xlim requires two numeric values: --ego-xlim=min,max")
       }
+    } else if (grepl("^--rds-dir=", a)) {
+      rds_dir <- sub("^--rds-dir=", "", a)
     }
   }
 
-  run_plots(name, save_path, from_tsv, ego_xlim)
+  run_plots(name, save_path, from_tsv, ego_xlim, rds_dir)
 }

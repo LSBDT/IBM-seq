@@ -321,13 +321,22 @@ Rscript r_script/04_features.R V5P2_24aB_CTCF_2 output 1000 4 --no-rds
 ### Step 5: 作図
 
 ```bash
-Rscript r_script/05_plot.R <name> <save_path> [--from-tsv] [--ego-xlim=min,max]
+Rscript r_script/05_plot.R <name> <save_path> [--from-tsv] [--ego-xlim=min,max] [--rds-dir=path]
 ```
 
 | オプション         | デフォルト | 説明                                              |
 |--------------------|------------|---------------------------------------------------|
 | `--from-tsv`       | —          | RDS の代わりに TSV を読み込む                     |
 | `--ego-xlim=min,max` | 4,2000   | Ego Size プロットの x軸範囲（例: `--ego-xlim=4,1000`）|
+| `--rds-dir=path`   | save_path  | RDS/TSV ファイルの読み込み元ディレクトリ<br>PDFは save_path へ出力される |
+
+```bash
+# 例：カレントディレクトリからRDSを読み込み、PDFはnimurarunへ出力
+Rscript r_script/05_plot.R V5P2_24aB_CTCF_1_S17 nimurarun --rds-dir=.
+
+# 例：Ego Size の x軸範囲を指定 + カレントディレクトリから読み込み
+Rscript r_script/05_plot.R V5P2_24aB_CTCF_1_S17 nimurarun --rds-dir=. --ego-xlim=4,1000
+```
 
 `save_path` の中にある `{name}` プレフィックスを持つファイルを自動で探し、それぞれの PDF を生成します。ファイルが存在しない場合はそのグラフをスキップして次へ進みます（エラーにはなりません）。
 
