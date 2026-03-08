@@ -56,8 +56,11 @@ run_clustering <- function(name, save_path, num_cores = 1L, louvain_min_size = 3
   # data.table の dcast を使い pivot_wider より高速・省メモリに変換
   test_dt   <- setDT(df_list)[, .(Count = .N), by = .(to, Target2)]
   test_wide <- dcast(test_dt, to ~ Target2, value.var = "Count", fill = 0L)
+  # CRITICAL: sort = FALSE を指定してノード順番を保持
+  #   merge() はデフォルトでソートするため、graph の頂点順番と不一致になる
+  #   → 後続の cbind(df$vertices, clusters, community_id) でミスマッチが発生
   df$vertices <- merge(df$vertices, as.data.frame(test_wide),
-                       by.x = "name", by.y = "to", all.x = TRUE)
+                       by.x = "name", by.y = "to", all.x = TRUE, sort = FALSE)
   # 孤立頂点など結合できなかった列を 0 埋め
   for (col in setdiff(names(df$vertices), "name")) {
     df$vertices[[col]][is.na(df$vertices[[col]])] <- 0L
