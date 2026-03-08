@@ -1,4 +1,0 @@
-version,n_vertices,n_membership_rows,order_identical,has_comm_id,comm_id_match,tested_communities,mismatched_comms
-sm,3531,3531,FALSE,TRUE,TRUE,10,10
-test,3531,3531,FALSE,TRUE,TRUE,10,10
-test_no_rds,3531,3531,FALSE,TRUE,TRUE,10,10
