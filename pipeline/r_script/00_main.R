@@ -27,6 +27,8 @@
 #                      RDS の I/O を省略してパイプラインを高速化したい場合に使用
 #                      ※ Step 1/2 の構造 RDS（graph.rds, membership.rds）は常に保存
 #                      ※ --no-rds 指定時は自動的に --from-tsv が有効になる
+#   --ego-xlim=min,max : Ego Size プロットの x軸範囲（デフォルト: 4,2000）
+#                      例: --ego-xlim=4,1000
 #
 # 使用例:
 #   # 全指標を計算（通常実行）
@@ -71,6 +73,7 @@ metrics          <- c("edge_density", "umi_uei", "ego_size", "diameter")
 from_tsv         <- FALSE
 no_rds           <- FALSE
 dedup_after      <- FALSE
+ego_xlim         <- c(4, 2000)
 
 for (a in args[-(1:3)]) {
   if (a %in% c("--no-dup", "--with-dup")) {
@@ -87,6 +90,13 @@ for (a in args[-(1:3)]) {
   } else if (a == "--no-rds") {
     no_rds   <- TRUE
     from_tsv <- TRUE  # --no-rds では作図も TSV から読む
+  } else if (grepl("^--ego-xlim=", a)) {
+    vals <- as.numeric(strsplit(sub("^--ego-xlim=", "", a), ",")[[1]])
+    if (length(vals) == 2 && all(!is.na(vals))) {
+      ego_xlim <- vals
+    } else {
+      stop("--ego-xlim requires two numeric values: --ego-xlim=min,max")
+    }
   } else if (grepl("^[0-9]+$", a)) {
     min_cluster_size <- as.integer(a)
   }
@@ -166,7 +176,7 @@ run_features(name, save_path, min_cluster_size, num_cores,
 # Step 5: 作図
 # ============================================================
 cat("\n--- Step 5: Plot ---\n")
-run_plots(name, save_path, from_tsv = from_tsv)
+run_plots(name, save_path, from_tsv = from_tsv, ego_xlim = ego_xlim)
 
 cat(paste0("\n=== IBMseq Pipeline DONE: ", Sys.time(), " ===\n"))
 cat(paste0("Output: ", save_path, "\n"))

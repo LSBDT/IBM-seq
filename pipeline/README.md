@@ -91,10 +91,9 @@ AAAAAAAAAAAGTATTCGGTC.S2P.t1     GATCGGAGATGATTAGCG.e1    S2P.t1       UEI1    1
 AAAAAAAAACAAAAATCGTCG.H3K4me1.t1 ACTAGAGCATGTGGGAGT.e1    H3K4me1.t1   UEI1    1
 ```
 - Target 列に複数の抗体（例: `CTCF.t1`, `H3K27ac.t1`, `H3K4me1.t1`, `S2P.t1` など）
-- 抗体数は 4-6 種類程度（データにより異なる。現在の Mix データでは 5 種類）
+- 抗体数は Mixの場合 5
 - 処理後の membership テーブルは自動的に抗体数に応じて列数が拡張される（例: 5 抗体 → 12 列）
-
-パイプラインは `data.table::dcast()` による横持ち変換を使用しているため、**抗体数に関わらず自動対応**します。
+  - パイプラインは `data.table::dcast()` による横持ち変換を使用しているため、**抗体数に関わらず自動対応**します。
 
 ### ノード名のサフィックス（suffix mode で使用）
 
@@ -175,6 +174,9 @@ Rscript r_script/00_main.R V5P2_24aB_CTCF_2 data output --from-tsv
 # RDS 中間ファイル不要・I/O を節約したい場合（TSV と PDF のみ出力）
 Rscript r_script/00_main.R V5P2_24aB_CTCF_2 data output --no-rds 1000 --cores=9
 
+# Ego Size プロットの x軸範囲を変更
+Rscript r_script/00_main.R V5P2_24aB_CTCF_2 data output --ego-xlim=4,1000
+
 # バックグラウンドで実行（ログをファイルに保存）
 nohup Rscript r_script/00_main.R V5P2_24aB_CTCF_2 data output \
   --no-dup 1000 --cores=9 > output/run.log 2>&1 &
@@ -200,7 +202,10 @@ Rscript r_script/sm_00_main.R V5P2_24aB_mix_2 data output --no-dup 1000 --cores=
 ## 5. 個別ステップの実行
 
 各ステップのスクリプトは `source()` での組み込みだけでなく、単独でも実行できます。
-前のステップの出力（`{name}_{step}_*.rds`）が `save_path` に存在していることが前提です。
+**注意点**
+- save_pathディレクトリは事前に存在している必要があります。
+- 前のステップの出力（`{name}_{step}_*.rds`）が `save_path` に存在していることが前提です。
+- rdsファイルは１つだけじゃなく、_02_graph.rds、_02_membership.rdsなど複数必要な場合もあります。
 
 ### Step 1: データ読み込み・グラフ構築
 
@@ -220,27 +225,47 @@ Rscript r_script/01_load_graph.R V5P2_24aB_CTCF_2 data output --no-dup
 
 ```bash
 # 標準モード
-Rscript r_script/02_clustering.R <name> <save_path> [--cores=N] [--louvain-min=N]
+Rscript r_script/02_clustering.R <name> <save_path> [num_cores] [--louvain-min=N] [--no-tsv]
 
 # SM モード（node_type 列を付加）
-Rscript r_script/sm_02_clustering.R <name> <save_path> [--cores=N] [--louvain-min=N]
+Rscript r_script/sm_02_clustering.R <name> <save_path> [num_cores] [--louvain-min=N] [--no-tsv]
 ```
 
 | オプション       | デフォルト | 説明                                              |
 |------------------|------------|---------------------------------------------------|
-| `--cores=N`      | 1          | Louvain 並列コア数                                |
+| `num_cores`      | 1          | Louvain 並列コア数（位置引数または `--cores=N`）  |
 | `--louvain-min=N`| 3          | Louvain 適用の最小ノード数（それ未満は省略）       |
+| `--no-tsv`       | —          | TSV 出力をスキップ（RDS のみ保存）                |
 
 - **入力**: `{save_path}/{name}_01_graph.rds`
 - **出力**: `{name}_02_graph.rds`, `{name}_02_membership.rds`, `{name}_02_community.rds`, `{name}_02_membership.tsv`, `{name}_02_summary.txt`
+
+```bash
+# 例：4コア使用
+Rscript r_script/02_clustering.R V5P2_24aB_CTCF_2 output 4
+
+# --cores=N 形式でも可能
+Rscript r_script/02_clustering.R V5P2_24aB_CTCF_2 output --cores=4
+
+# TSV 出力なし（RDS のみ）
+Rscript r_script/02_clustering.R V5P2_24aB_CTCF_2 output 4 --no-tsv
+```
 
 > **ポイント**: `--louvain-min=3`（デフォルト）により、ノードが 2 個以下の連結成分は Louvain をスキップし、連結成分 ID をそのままコミュニティ ID として使います。これにより数百万の trivial コンポーネントを持つ大規模データでも高速に処理できます。
 
 ### Step 3: クラスターサイズ・Edge Density 計算
 
 ```bash
-Rscript r_script/03_density.R <name> <save_path> [min_cluster_size] [num_cores] [--no-edge-density]
+Rscript r_script/03_density.R <name> <save_path> [min_cluster_size] [num_cores] [--no-edge-density] [--no-rds] [--no-tsv]
 ```
+
+| オプション           | デフォルト | 説明                                              |
+|----------------------|------------|---------------------------------------------------|
+| `min_cluster_size`   | 1000       | 指標計算対象クラスターの最小ノード数              |
+| `num_cores`          | 1          | Edge Density 並列計算コア数（位置引数または `--cores=N`）|
+| `--no-edge-density`  | —          | Edge Density 計算をスキップ                       |
+| `--no-rds`           | —          | RDS 出力をスキップ（TSV のみ保存）                |
+| `--no-tsv`           | —          | TSV 出力をスキップ（RDS のみ保存）                |
 
 - **入力**: `{name}_02_graph.rds`, `{name}_02_membership.rds`
 - **出力**: `{name}_03_cluster_size.rds/.tsv`, `{name}_03_edge_density.rds/.tsv`, `{name}_03_density_summary.txt`
@@ -248,29 +273,69 @@ Rscript r_script/03_density.R <name> <save_path> [min_cluster_size] [num_cores] 
 ```bash
 # 例：min_cluster_size=1000、4コア
 Rscript r_script/03_density.R V5P2_24aB_CTCF_2 output 1000 4
+
+# TSV 出力なし（RDS のみ）
+Rscript r_script/03_density.R V5P2_24aB_CTCF_2 output 1000 4 --no-tsv
+
+# RDS 出力なし（TSV のみ）
+Rscript r_script/03_density.R V5P2_24aB_CTCF_2 output 1000 4 --no-rds
+
+# Edge Density スキップ、RDS のみ
+Rscript r_script/03_density.R V5P2_24aB_CTCF_2 output 1000 4 --no-edge-density --no-tsv
 ```
 
 ### Step 4: 特徴量計算（UMI/UEI・Ego Size・Diameter）
 
 ```bash
 # 標準モード
-Rscript r_script/04_features.R <name> <save_path> [min_cluster_size] [num_cores] [--metrics=...]
+Rscript r_script/04_features.R <name> <save_path> [min_cluster_size] [num_cores] [--metrics=...] [--no-rds] [--no-tsv]
 
 # SM モード（UMI/UEI が高速）
-Rscript r_script/sm_04_features.R <name> <save_path> [min_cluster_size] [--cores=N] [--metrics=...]
+Rscript r_script/sm_04_features.R <name> <save_path> [min_cluster_size] [--cores=N] [--metrics=...] [--no-rds] [--no-tsv]
 ```
 
-```bash
-# 例：UMI/UEI だけ再計算
-Rscript r_script/04_features.R V5P2_24aB_CTCF_2 output 1000 1 --metrics=umi_uei
-```
+| オプション         | デフォルト           | 説明                                              |
+|--------------------|----------------------|---------------------------------------------------|
+| `min_cluster_size` | 1000                 | 指標計算対象クラスターの最小ノード数              |
+| `num_cores`        | 1                    | 並列計算コア数（位置引数または `--cores=N`）      |
+| `--metrics=A,B,..` | 全指標               | 計算する指標（`umi_uei`,`ego_size`,`diameter`）   |
+| `--no-rds`         | —                    | RDS 出力をスキップ（TSV のみ保存）                |
+| `--no-tsv`         | —                    | TSV 出力をスキップ（RDS のみ保存）                |
 
 - **出力**: `{name}_04_umi_uei.rds/.tsv`, `{name}_04_ego_size.rds/.tsv`, `{name}_04_diameter.rds/.tsv`
+
+```bash
+# 例：全指標、4コア
+Rscript r_script/04_features.R V5P2_24aB_CTCF_2 output 1000 4
+
+# UMI/UEI だけ再計算
+Rscript r_script/04_features.R V5P2_24aB_CTCF_2 output 1000 1 --metrics=umi_uei
+
+# ego_size と diameter のみ、TSV なし（RDS のみ）
+Rscript r_script/04_features.R V5P2_24aB_CTCF_2 output 1000 4 --metrics=ego_size,diameter --no-tsv
+
+# RDS なし（TSV のみ）
+Rscript r_script/04_features.R V5P2_24aB_CTCF_2 output 1000 4 --no-rds
+```
 
 ### Step 5: 作図
 
 ```bash
-Rscript r_script/05_plot.R <name> <save_path> [--from-tsv]
+Rscript r_script/05_plot.R <name> <save_path> [--from-tsv] [--ego-xlim=min,max] [--rds-dir=path]
+```
+
+| オプション         | デフォルト | 説明                                              |
+|--------------------|------------|---------------------------------------------------|
+| `--from-tsv`       | —          | RDS の代わりに TSV を読み込む                     |
+| `--ego-xlim=min,max` | 4,2000   | Ego Size プロットの x軸範囲（例: `--ego-xlim=4,1000`）|
+| `--rds-dir=path`   | save_path  | RDS/TSV ファイルの読み込み元ディレクトリ<br>PDFは save_path へ出力される |
+
+```bash
+# 例：カレントディレクトリからRDSを読み込み、PDFはnimurarunへ出力
+Rscript r_script/05_plot.R V5P2_24aB_CTCF_1_S17 nimurarun --rds-dir=.
+
+# 例：Ego Size の x軸範囲を指定 + カレントディレクトリから読み込み
+Rscript r_script/05_plot.R V5P2_24aB_CTCF_1_S17 nimurarun --rds-dir=. --ego-xlim=4,1000
 ```
 
 `save_path` の中にある `{name}` プレフィックスを持つファイルを自動で探し、それぞれの PDF を生成します。ファイルが存在しない場合はそのグラフをスキップして次へ進みます（エラーにはなりません）。

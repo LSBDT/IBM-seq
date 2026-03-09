@@ -14,6 +14,8 @@
 #   --prefix=str     : 出力ファイルのプレフィックス（デフォルト: combined）
 #   --from-tsv       : RDS の代わりに TSV ファイルから読み込む
 #   --min-size=N     : cluster_size プロットの最小クラスターサイズ閾値（デフォルト: 0 = 全クラスター）
+#   --ego-xlim=min,max : Ego Size プロットの x軸範囲（デフォルト: 自動設定）
+#                        例: --ego-xlim=4,1000
 #
 # 出力:
 #   {out_dir}/{prefix}_06_cluster_size.pdf
@@ -30,7 +32,7 @@
 # =============================================================================
 
 run_combine_plots <- function(entries, out_dir, prefix = "combined",
-                              from_tsv = FALSE, min_size = 0L) {
+                              from_tsv = FALSE, min_size = 0L, ego_xlim = NULL) {
   # entries: list of list(dir = ..., name = ...)
 
   dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
@@ -169,8 +171,17 @@ run_combine_plots <- function(entries, out_dir, prefix = "combined",
     es[, library := factor(library, levels = names_ordered)]
     pos_vals <- es$value[es$value > 0]
     if (length(pos_vals) > 0) {
-      x_lo <- floor(log10(max(1, min(pos_vals)))) |> (\(e) 10^e)()
-      x_hi <- ceiling(log10(max(pos_vals) * 2))   |> (\(e) 10^e)()
+      # x軸範囲: オプション指定がある場合はそれを使用、なければ自動計算
+      if (!is.null(ego_xlim) && length(ego_xlim) == 2) {
+        x_lo <- ego_xlim[1]
+        x_hi <- ego_xlim[2]
+        xlim_msg <- paste0("(xlim=", paste(ego_xlim, collapse=","), ")")
+      } else {
+        x_lo <- 10^floor(log10(max(1, min(pos_vals))))
+        x_hi <- 10^ceiling(log10(max(pos_vals) * 2))
+        xlim_msg <- paste0("(xlim=auto: ", x_lo, ",", x_hi, ")")
+      }
+
       p <- ggplot(es, aes(x = value)) +
         geom_density(aes(color = as.factor(community_id)), show.legend = FALSE) +
         facet_wrap(~ library, ncol = n) +
@@ -178,6 +189,7 @@ run_combine_plots <- function(entries, out_dir, prefix = "combined",
         scale_x_log10(limits = c(x_lo, x_hi)) +
         my_plot2
       save_pdf(p, "ego_size", pdf_width = max(7, 4 * n))
+      write_log(paste0("  Ego Size facet plot ", xlim_msg))
 
       # 元スクリプト(10.1.mix.r)スタイル: マルチページPDF（各サンプル1ページ）
       # 1つのPDFに全サンプルをページごとに出力（比較しやすい）
@@ -196,7 +208,7 @@ run_combine_plots <- function(entries, out_dir, prefix = "combined",
         }
       }
       dev.off()
-      write_log(paste0("  Saved: ", basename(out_multipage), " (multipage style)"))
+      write_log(paste0("  Saved: ", basename(out_multipage), " (multipage style) ", xlim_msg))
     } else {
       write_log("  SKIP ego_size: no positive values to plot")
     }
@@ -233,10 +245,10 @@ if (!exists("IBMSEQ_SOURCED")) {
   if (length(args) == 0) {
     cat(paste(
       "Usage (同一ディレクトリ):",
-      "  Rscript 06_combine_plot.R <rds_dir> <name1,name2,...> [--out=dir] [--prefix=str] [--from-tsv] [--min-size=N]",
+      "  Rscript 06_combine_plot.R <rds_dir> <name1,name2,...> [--out=dir] [--prefix=str] [--from-tsv] [--min-size=N] [--ego-xlim=min,max]",
       "",
       "Usage (異なるディレクトリ):",
-      "  Rscript 06_combine_plot.R --out=<out_dir> <dir1>:<name1> [<dir2>:<name2> ...] [--prefix=str] [--from-tsv]",
+      "  Rscript 06_combine_plot.R --out=<out_dir> <dir1>:<name1> [<dir2>:<name2> ...] [--prefix=str] [--from-tsv] [--ego-xlim=min,max]",
       "",
       "例:",
       "  Rscript 06_combine_plot.R /output sampleA,sampleB,sampleC",
@@ -251,6 +263,7 @@ if (!exists("IBMSEQ_SOURCED")) {
   from_tsv   <- FALSE
   out_dir    <- NULL
   min_size   <- 0L
+  ego_xlim   <- NULL
   entries    <- list()
   positional <- character(0)
 
@@ -263,6 +276,13 @@ if (!exists("IBMSEQ_SOURCED")) {
       from_tsv <- TRUE
     } else if (grepl("^--min-size=[0-9]+$", a)) {
       min_size <- as.integer(sub("^--min-size=", "", a))
+    } else if (grepl("^--ego-xlim=", a)) {
+      vals <- as.numeric(strsplit(sub("^--ego-xlim=", "", a), ",")[[1]])
+      if (length(vals) == 2 && all(!is.na(vals))) {
+        ego_xlim <- vals
+      } else {
+        stop("--ego-xlim requires two numeric values: --ego-xlim=min,max")
+      }
     } else {
       positional <- c(positional, a)
     }
@@ -301,5 +321,5 @@ if (!exists("IBMSEQ_SOURCED")) {
     stop("比較には 2 サンプル以上を指定してください。")
   }
 
-  run_combine_plots(entries, out_dir, prefix, from_tsv, min_size)
+  run_combine_plots(entries, out_dir, prefix, from_tsv, min_size, ego_xlim)
 }

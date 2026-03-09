@@ -21,6 +21,8 @@
 #   --from-tsv       : 作図ステップで TSV から読み込む
 #   --no-rds         : Step 3/4 の指標 RDS ファイルを保存しない（TSV のみ出力）
 #                      --no-rds 指定時は自動的に --from-tsv が有効になる
+#   --ego-xlim=min,max : Ego Size プロットの x軸範囲（デフォルト: 4,2000）
+#                      例: --ego-xlim=4,1000
 #
 # 使用例:
 #   Rscript sm_00_main.R V5P2_24aB_CTCF_2_3000 /data /output --no-dup 1000 --cores=9
@@ -44,6 +46,7 @@ metrics          <- c("edge_density", "umi_uei", "ego_size", "diameter")
 from_tsv         <- FALSE
 no_rds           <- FALSE
 dedup_after      <- FALSE
+ego_xlim         <- c(4, 2000)
 
 for (a in args[-(1:3)]) {
   if (a %in% c("--no-dup", "--with-dup")) {
@@ -60,6 +63,13 @@ for (a in args[-(1:3)]) {
   } else if (a == "--no-rds") {
     no_rds   <- TRUE
     from_tsv <- TRUE
+  } else if (grepl("^--ego-xlim=", a)) {
+    vals <- as.numeric(strsplit(sub("^--ego-xlim=", "", a), ",")[[1]])
+    if (length(vals) == 2 && all(!is.na(vals))) {
+      ego_xlim <- vals
+    } else {
+      stop("--ego-xlim requires two numeric values: --ego-xlim=min,max")
+    }
   } else if (grepl("^[0-9]+$", a)) {
     min_cluster_size <- as.integer(a)
   }
@@ -137,7 +147,7 @@ run_features(name, save_path, min_cluster_size, num_cores,
 # Step 5: 作図
 # ============================================================
 cat("\n--- Step 5: Plot ---\n")
-run_plots(name, save_path, from_tsv = from_tsv)
+run_plots(name, save_path, from_tsv = from_tsv, ego_xlim = ego_xlim)
 
 cat(paste0("\n=== IBMseq Pipeline DONE [suffix mode]: ", Sys.time(), " ===\n"))
 cat(paste0("Output: ", save_path, "\n"))

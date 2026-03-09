@@ -17,11 +17,12 @@
 #         {save_path}/{name}_02_summary.txt         ← クラスタリング統計
 #
 # 使い方（スタンドアロン）:
-#   Rscript 02_clustering.R <name> <save_path>
+#   Rscript 02_clustering.R <name> <save_path> [num_cores] [--louvain-min=N] [--dedup-after] [--no-tsv]
+#   デフォルト: num_cores=1, louvain_min_size=3, dedup_after=FALSE, save_tsv=TRUE
 # =============================================================================
 
 run_clustering <- function(name, save_path, num_cores = 1L, louvain_min_size = 3L,
-                           dedup_after = FALSE) {
+                           dedup_after = FALSE, save_tsv = TRUE) {
 
   log_file <- file.path(save_path, paste0(name, "_process.log"))
   write_log <- function(msg) {
@@ -32,7 +33,8 @@ run_clustering <- function(name, save_path, num_cores = 1L, louvain_min_size = 3
   write_log(paste0("[02_clustering] START: ", Sys.time(),
                    "  num_cores=", num_cores,
                    "  louvain_min_size=", louvain_min_size,
-                   "  dedup_after=", dedup_after))
+                   "  dedup_after=", dedup_after,
+                   "  save_tsv=", save_tsv))
 
   # ---- Step1 出力を読み込み ----
   graph_file <- file.path(save_path, paste0(name, "_01_graph.rds"))
@@ -54,8 +56,11 @@ run_clustering <- function(name, save_path, num_cores = 1L, louvain_min_size = 3
   # data.table の dcast を使い pivot_wider より高速・省メモリに変換
   test_dt   <- setDT(df_list)[, .(Count = .N), by = .(to, Target2)]
   test_wide <- dcast(test_dt, to ~ Target2, value.var = "Count", fill = 0L)
+  # CRITICAL: sort = FALSE を指定してノード順番を保持
+  #   merge() はデフォルトでソートするため、graph の頂点順番と不一致になる
+  #   → 後続の cbind(df$vertices, clusters, community_id) でミスマッチが発生
   df$vertices <- merge(df$vertices, as.data.frame(test_wide),
-                       by.x = "name", by.y = "to", all.x = TRUE)
+                       by.x = "name", by.y = "to", all.x = TRUE, sort = FALSE)
   # 孤立頂点など結合できなかった列を 0 埋め
   for (col in setdiff(names(df$vertices), "name")) {
     df$vertices[[col]][is.na(df$vertices[[col]])] <- 0L
@@ -152,9 +157,13 @@ run_clustering <- function(name, save_path, num_cores = 1L, louvain_min_size = 3
   write_log(paste0("  Saved: ", name, "_02_graph.rds / _02_membership.rds / _02_community.rds"))
 
   # ---- テキスト出力（検証用）----
-  tsv_out <- file.path(save_path, paste0(name, "_02_membership.tsv"))
-  fwrite(as.data.table(df_membership), tsv_out, sep = "\t", quote = FALSE)
-  write_log(paste0("  Saved: ", tsv_out))
+  if (save_tsv) {
+    tsv_out <- file.path(save_path, paste0(name, "_02_membership.tsv"))
+    fwrite(as.data.table(df_membership), tsv_out, sep = "\t", quote = FALSE)
+    write_log(paste0("  Saved: ", tsv_out))
+  } else {
+    write_log("  TSV output skipped (save_tsv=FALSE)")
+  }
 
   # ---- サマリーテキスト ----
   summary_out <- file.path(save_path, paste0(name, "_02_summary.txt"))
@@ -185,18 +194,27 @@ if (!exists("IBMSEQ_SOURCED")) {
   })
 
   args <- commandArgs(trailingOnly = TRUE)
-  if (length(args) < 2) stop("Usage: Rscript 02_clustering.R <name> <save_path> [--cores=N] [--louvain-min=N] [--dedup-after]")
+  if (length(args) < 2) stop("Usage: Rscript 02_clustering.R <name> <save_path> [num_cores] [--louvain-min=N] [--dedup-after] [--no-tsv]")
   name             <- args[1]
   save_path        <- args[2]
   num_cores        <- 1L
   louvain_min_size <- 3L
   dedup_after      <- FALSE
+  save_tsv         <- TRUE
 
   for (a in args[-(1:2)]) {
-    if (grepl("^--cores=[0-9]+$", a))       num_cores        <- as.integer(sub("^--cores=", "", a))
-    if (grepl("^--louvain-min=[0-9]+$", a)) louvain_min_size <- as.integer(sub("^--louvain-min=", "", a))
-    if (a == "--dedup-after")               dedup_after      <- TRUE
+    if (grepl("^--cores=[0-9]+$", a)) {
+      num_cores <- as.integer(sub("^--cores=", "", a))
+    } else if (grepl("^--louvain-min=[0-9]+$", a)) {
+      louvain_min_size <- as.integer(sub("^--louvain-min=", "", a))
+    } else if (a == "--dedup-after") {
+      dedup_after <- TRUE
+    } else if (a == "--no-tsv") {
+      save_tsv <- FALSE
+    } else if (grepl("^[0-9]+$", a)) {
+      num_cores <- as.integer(a)
+    }
   }
 
-  run_clustering(name, save_path, num_cores, louvain_min_size, dedup_after)
+  run_clustering(name, save_path, num_cores, louvain_min_size, dedup_after, save_tsv)
 }

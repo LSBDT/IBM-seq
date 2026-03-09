@@ -1,10 +1,10 @@
 #!/usr/bin/env Rscript
 # =============================================================================
-# test_compare_dup_modes.R
-# --no-dup と --dup-then-dedup のクラスター数・分布を比較するテストスクリプト
+# test_compare_with_then.R
+# --with-dup と --dup-then-dedup のクラスター数・分布を比較するテストスクリプト
 #
 # Usage:
-#   Rscript test_compare_dup_modes.R <name> <data_dir> <out_base> [min_cluster_size]
+#   Rscript test_compare_with_then.R <name> <data_dir> <out_base> [min_cluster_size]
 #
 # 引数:
 #   name             : サンプル名（例: V5P2_24aB_CTCF_2_3000）
@@ -13,13 +13,13 @@
 #   min_cluster_size : クラスターサイズ閾値（デフォルト: 3）
 #
 # 出力:
-#   {out_base}/nodup/        : --no-dup モードの中間ファイル
-#   {out_base}/dup/          : --dup-then-dedup モードの中間ファイル
-#   {out_base}/compare_dup_modes.pdf  : 比較グラフ
-#   {out_base}/compare_dup_modes_summary.tsv : 数値サマリー
+#   {out_base}/with_dup/     : --with-dup モードの中間ファイル
+#   {out_base}/dup_dedup/    : --dup-then-dedup モードの中間ファイル
+#   {out_base}/compare_with_then.pdf  : 比較グラフ
+#   {out_base}/compare_with_then_summary.tsv : 数値サマリー
 #
 # 例:
-#   Rscript test_compare_dup_modes.R \
+#   Rscript test_compare_with_then.R \
 #     V5P2_24aB_CTCF_2_3000 data data/output_test_compare 3
 # =============================================================================
 
@@ -32,7 +32,7 @@ suppressPackageStartupMessages({
 
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 3) {
-  stop("Usage: Rscript test_compare_dup_modes.R <name> <data_dir> <out_base> [min_cluster_size] [num_cores]")
+  stop("Usage: Rscript test_compare_with_then.R <name> <data_dir> <out_base> [min_cluster_size] [num_cores]")
 }
 
 name             <- args[1]
@@ -41,19 +41,19 @@ out_base         <- args[3]
 min_cluster_size <- if (length(args) >= 4) as.integer(args[4]) else 3L
 num_cores        <- if (length(args) >= 5) as.integer(args[5]) else 1L
 
-out_nodup <- file.path(out_base, "nodup")
-out_dup   <- file.path(out_base, "dup")
-out_pdf   <- file.path(out_base, "compare_dup_modes.pdf")
-out_tsv   <- file.path(out_base, "compare_dup_modes_summary.tsv")
+out_with_dup  <- file.path(out_base, "with_dup")
+out_dup_dedup <- file.path(out_base, "dup_dedup")
+out_pdf       <- file.path(out_base, "compare_with_then.pdf")
+out_tsv       <- file.path(out_base, "compare_with_then_summary.tsv")
 
-dir.create(out_nodup, recursive = TRUE, showWarnings = FALSE)
-dir.create(out_dup,   recursive = TRUE, showWarnings = FALSE)
+dir.create(out_with_dup,  recursive = TRUE, showWarnings = FALSE)
+dir.create(out_dup_dedup, recursive = TRUE, showWarnings = FALSE)
 
-cat("=== test_compare_dup_modes START ===\n")
+cat("=== test_compare_with_then START ===\n")
 cat(paste0("  name             = ", name,             "\n"))
 cat(paste0("  data_dir         = ", data_dir,         "\n"))
-cat(paste0("  out_nodup        = ", out_nodup,        "\n"))
-cat(paste0("  out_dup          = ", out_dup,          "\n"))
+cat(paste0("  out_with_dup     = ", out_with_dup,     "\n"))
+cat(paste0("  out_dup_dedup    = ", out_dup_dedup,    "\n"))
 cat(paste0("  min_cluster_size = ", min_cluster_size, "\n"))
 cat(paste0("  num_cores        = ", num_cores,        "\n\n"))
 
@@ -71,25 +71,25 @@ source(file.path(r_script_dir, "02_clustering.R"))
 source(file.path(r_script_dir, "03_density.R"))
 
 # ============================================================
-# モード 1: --no-dup
+# モード 1: --with-dup (重複エッジを含んだまま全処理)
 # ============================================================
-cat("\n--- [Mode 1/2] --no-dup ---\n")
-writeLines("", file.path(out_nodup, paste0(name, "_process.log")))
+cat("\n--- [Mode 1/2] --with-dup ---\n")
+writeLines("", file.path(out_with_dup, paste0(name, "_process.log")))
 
-load_graph(name, data_dir, out_nodup, dup_mode = "--no-dup")
-run_clustering(name, out_nodup, num_cores = num_cores, dedup_after = FALSE)
-run_density(name, out_nodup, min_cluster_size, num_cores = num_cores,
+load_graph(name, data_dir, out_with_dup, dup_mode = "--with-dup")
+run_clustering(name, out_with_dup, num_cores = num_cores, dedup_after = FALSE)
+run_density(name, out_with_dup, min_cluster_size, num_cores = num_cores,
             compute_edge_density = FALSE, save_rds = FALSE)
 
 # ============================================================
-# モード 2: --dup-then-dedup
+# モード 2: --dup-then-dedup (クラスタリング後に重複除去)
 # ============================================================
 cat("\n--- [Mode 2/2] --dup-then-dedup ---\n")
-writeLines("", file.path(out_dup, paste0(name, "_process.log")))
+writeLines("", file.path(out_dup_dedup, paste0(name, "_process.log")))
 
-load_graph(name, data_dir, out_dup, dup_mode = "--with-dup")
-run_clustering(name, out_dup, num_cores = num_cores, dedup_after = TRUE)
-run_density(name, out_dup, min_cluster_size, num_cores = num_cores,
+load_graph(name, data_dir, out_dup_dedup, dup_mode = "--with-dup")
+run_clustering(name, out_dup_dedup, num_cores = num_cores, dedup_after = TRUE)
+run_density(name, out_dup_dedup, min_cluster_size, num_cores = num_cores,
             compute_edge_density = FALSE, save_rds = FALSE)
 
 # ============================================================
@@ -105,10 +105,10 @@ load_cluster_size <- function(dir, mode_label) {
   dt
 }
 
-dt_nodup <- load_cluster_size(out_nodup, "--no-dup")
-dt_dup   <- load_cluster_size(out_dup,   "--dup-then-dedup")
-combined <- rbindlist(list(dt_nodup, dt_dup))
-combined[, mode := factor(mode, levels = c("--no-dup", "--dup-then-dedup"))]
+dt_with_dup  <- load_cluster_size(out_with_dup,  "--with-dup")
+dt_dup_dedup <- load_cluster_size(out_dup_dedup, "--dup-then-dedup")
+combined <- rbindlist(list(dt_with_dup, dt_dup_dedup))
+combined[, mode := factor(mode, levels = c("--with-dup", "--dup-then-dedup"))]
 
 # ============================================================
 # 数値サマリー
@@ -133,7 +133,7 @@ cat(paste0("  Saved summary: ", out_tsv, "\n"))
 # ============================================================
 cat("\n--- Plotting ---\n")
 
-MODE_COLORS <- c("--no-dup" = "#377EB8", "--dup-then-dedup" = "#E41A1C")
+MODE_COLORS <- c("--with-dup" = "#4DAF4A", "--dup-then-dedup" = "#E41A1C")
 
 my_theme <- theme_bw() +
   theme(
@@ -152,21 +152,21 @@ pdf(out_pdf, width = 10, height = 8)
 
 # ---- 表紙 ----
 plot.new()
-n_nodup <- summary_dt[mode == "--no-dup",      n_clusters]
-n_dup   <- summary_dt[mode == "--dup-then-dedup", n_clusters]
+n_with_dup  <- summary_dt[mode == "--with-dup",      n_clusters]
+n_dup_dedup <- summary_dt[mode == "--dup-then-dedup", n_clusters]
 text(0.5, 0.75,
-     paste0("--no-dup vs --dup-then-dedup\nCluster Count Comparison\n", name),
+     paste0("--with-dup vs --dup-then-dedup\nCluster Count Comparison\n", name),
      cex = 1.4, font = 2, adj = 0.5)
 text(0.5, 0.52,
-     paste0("--no-dup       : ", n_nodup, " clusters\n",
-            "--dup-then-dedup: ", n_dup,   " clusters\n",
-            "Difference     : ", n_dup - n_nodup,
-            " (", round((n_dup - n_nodup) / n_nodup * 100, 1), "%)"),
+     paste0("--with-dup       : ", n_with_dup,  " clusters\n",
+            "--dup-then-dedup : ", n_dup_dedup, " clusters\n",
+            "Difference       : ", n_dup_dedup - n_with_dup,
+            " (", round((n_dup_dedup - n_with_dup) / n_with_dup * 100, 1), "%)"),
      cex = 1.1, adj = 0.5)
 text(0.5, 0.30,
      paste0("min_cluster_size = ", min_cluster_size, "\n",
-            "Louvain is stochastic: exact counts may vary per run.\n",
-            "Comparison is distributional."),
+            "Both modes cluster with duplicates.\n",
+            "--dup-then-dedup removes duplicates after clustering."),
      cex = 0.9, col = "gray30", adj = 0.5)
 
 # ---- 1. クラスター総数の棒グラフ ----
@@ -266,6 +266,6 @@ if (nrow(combined) > 0) {
 
 dev.off()
 
-cat(paste0("\n=== test_compare_dup_modes DONE: ", Sys.time(), " ===\n"))
+cat(paste0("\n=== test_compare_with_then DONE: ", Sys.time(), " ===\n"))
 cat(paste0("  PDF    : ", out_pdf, "\n"))
 cat(paste0("  Summary: ", out_tsv, "\n"))
