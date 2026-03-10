@@ -12,7 +12,7 @@
 #   sm_02_clustering.R で生成した _02_membership.rds（node_type 列あり）が必要
 #
 # NODE_TYPE_LABELS は sm_02_clustering.R の NODE_TYPE_MAP と対応させること:
-#   1 = UMI1 (.m1)   2 = UMI2 (.t2)   3 = UEI1 (.e1)   4 = UEI2 (.e2)
+#   1 = UMI1 (.t1)   2 = UMI2 (.t2)   3 = UEI1 (.e1)   4 = UEI2 (.e2)
 #
 # Input:
 #   {save_path}/{name}_02_membership.rds  ← node_type 列を含む（sm_02_clustering 出力）

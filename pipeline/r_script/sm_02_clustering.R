@@ -7,7 +7,7 @@
 #   - node_type は run_umi_uei() の grepl ループを置き換えるための事前計算
 #
 # node_type 対応表（sm_04_features.R の NODE_TYPE_LABELS と一致させること）:
-#   1 = UMI1 (.m1)   2 = UMI2 (.t2)   3 = UEI1 (.e1)   4 = UEI2 (.e2)
+#   1 = UMI1 (.t1)   2 = UMI2 (.t2)   3 = UEI1 (.e1)   4 = UEI2 (.e2)
 #   NA = 上記以外のサフィックス
 #
 # Input : {save_path}/{name}_01_graph.rds
@@ -24,7 +24,7 @@
 
 # サフィックス → 整数コード 対応表
 # sm_04_features.R の NODE_TYPE_LABELS と対応が取れていること
-NODE_TYPE_MAP <- c(m1 = 1L, t2 = 2L, e1 = 3L, e2 = 4L)
+NODE_TYPE_MAP <- c(t1 = 1L, t2 = 2L, e1 = 3L, e2 = 4L)
 
 run_clustering <- function(name, save_path, num_cores = 1L, louvain_min_size = 3L,
                            dedup_after = FALSE) {

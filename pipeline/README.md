@@ -99,7 +99,7 @@ AAAAAAAAACAAAAATCGTCG.H3K4me1.t1 ACTAGAGCATGTGGGAGT.e1    H3K4me1.t1   UEI1    1
 
 | サフィックス | ノードタイプ | 意味                  |
 |--------------|--------------|-----------------------|
-| `.m1`        | UMI1         | UMI 型ノード（side 1）|
+| `.t1`        | UMI1         | UMI 型ノード（side 1）|
 | `.t2`        | UMI2         | UMI 型ノード（side 2）|
 | `.e1`        | UEI1         | UEI 型ノード（side 1）|
 | `.e2`        | UEI2         | UEI 型ノード（side 2）|

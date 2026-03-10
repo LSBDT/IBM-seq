@@ -75,9 +75,9 @@ run_umi_uei <- function(name, save_path, min_cluster_size = 1000L, num_cores = 1
 
   write_log(paste0("  Calculating UMI/UEI counts for ", length(cluster_list), " cluster(s)..."))
   # NOTE: suffixパターンはfastqの処理コードに合わせること
-  #       現在: UMI1=.m1, UMI2=.t2, UEI1=.e1, UEI2=.e2
+  #       現在: UMI1=.t1, UMI2=.t2, UEI1=.e1, UEI2=.e2
   #       変更が必要な場合は suffixes ベクトルを修正する
-  suffixes <- c("UMI1" = "\\.m1$",
+  suffixes <- c("UMI1" = "\\.t1$",
                 "UMI2" = "\\.t2$",
                 "UEI1" = "\\.e1$",
                 "UEI2" = "\\.e2$")
