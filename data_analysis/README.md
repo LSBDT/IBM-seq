@@ -108,13 +108,13 @@ IBMseqパイプラインにかけた際に出力される
 
 cycle rankはグラフ内の独立なサイクル数を表す指標[1]であり、以下で定義される。
 
- $\mathrm{cycle\,rank}= E-N+C$
+ $\mathrm{cycle\ rank}= E-N+C$
 
 - $E$：エッジ数
 - $N$：ノード数
 - $C$：連結成分数
 
-[1] Harary, F. (1969). *Graph Theory.*p32-41
+[1] Harary, F. (1969). *Graph Theory*.p32-41
 
 出力
 
@@ -158,7 +158,7 @@ $E_{tree}=N-C$
 
 であるため、観察されたエッジ数を比較して以下の指標を定義する。
 
- $\mathrm{tree\,likeness}=\frac{E_{tree}}{E_{obs}}=\frac{N-C}{E}$
+ $\mathrm{tree\ likeness}=\frac{E_{tree}}{E_{obs}}=\frac{N-C}{E}$
 
 - 値が 1 に近いほど tree構造に近い
 - 値が小さいほどサイクルを多く含む構造
