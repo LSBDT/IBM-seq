@@ -1,6 +1,6 @@
 library(igraph)
 library(dplyr)
-##update 2026/03/04
+##update 2026/03/09
 
 #############################
 # 1. subgraph内ノード数が4より多いsubgraphとコミュニティ情報の抽出
@@ -95,8 +95,8 @@ cycle_rank_per_community <- function(graph, membership, threshold) {
     vid <- V(graph)[V(graph)$community_id == i]
     n_nodes <- length(vid)
     
-    subgraph <- induced_subgraph(graph, vids = vid)
-    
+    subgraph <- induced_subgraph(graph, vids = vid) %>%
+      simplify(remove.multiple = TRUE, remove.loops = TRUE)    
     m_edge <- ecount(subgraph)
     c_comp <- components(subgraph)$no
     cycle_rank <- m_edge - n_nodes + c_comp
@@ -132,30 +132,25 @@ tree_likeness_per_community <- function(graph, membership, threshold) {
     
     vid <- V(graph)[V(graph)$community_id == i]
     n_nodes <- length(vid)
-    
+
     subgraph <- induced_subgraph(graph, vids = vid) %>%
       simplify(remove.multiple = TRUE, remove.loops = TRUE)
-    
-    c_comp <- components(subgraph)$no
-    
-    if (c_comp > 1) {
-      density <- NA_real_
-      tree_theoretical_density <- NA_real_
-      ratio <- NA_real_
+    m_edge <- ecount(subgraph)
+    c_comp <- igraph::components(subgraph)$no
+
+    tree_likeness_ratio <- if (m_edge == 0) {
+      NA_real_
     } else {
-      density <- edge_density(subgraph)
-      tree_theoretical_density <- if (n_nodes > 0) 2 / n_nodes else NA_real_
-      ratio <- tree_theoretical_density / density
+      (n_nodes - c_comp) / m_edge
     }
     
     data.frame(
       subgraph_id = dplyr::first(sub_id, default = NA),
       community_id = i,
       n_nodes = n_nodes,
+      edge_count = m_edge,
       n_components = c_comp,
-      density = density,
-      tree_theoretical_density = tree_theoretical_density,
-      tree_likeness_ratio = ratio
+      tree_likeness_ratio = tree_likeness_ratio
     )
   })
   
