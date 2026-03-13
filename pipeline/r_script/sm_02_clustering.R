@@ -57,7 +57,7 @@ run_clustering <- function(name, save_path, num_cores = 1L, louvain_min_size = 3
   test_dt   <- setDT(df_list)[, .(Count = .N), by = .(to, Target2)]
   test_wide <- dcast(test_dt, to ~ Target2, value.var = "Count", fill = 0L)
   df$vertices <- merge(df$vertices, as.data.frame(test_wide),
-                       by.x = "name", by.y = "to", all.x = TRUE)
+                       by.x = "name", by.y = "to", all.x = TRUE, sort = FALSE)
   for (col in setdiff(names(df$vertices), "name")) {
     df$vertices[[col]][is.na(df$vertices[[col]])] <- 0L
   }
