@@ -23,12 +23,22 @@
 #   {out_dir}/{prefix}_06_umi_uei.pdf
 #   {out_dir}/{prefix}_06_ego_size.pdf
 #   {out_dir}/{prefix}_06_diameter.pdf
+#   {out_dir}/{prefix}_06_antibody_counts.pdf (Mix データのみ)
+#   {out_dir}/{prefix}_06_antibody_counts_by_sample.pdf (Mix データのみ)
 #   {out_dir}/{prefix}_06_combine.log
 #
 # 例:
+#   # 基本的な使い方
 #   Rscript 06_combine_plot.R /output sampleA,sampleB,sampleC
+#
+#   # 閾値1000以上のクラスターのみ（cluster_size と antibody_counts に適用）
 #   Rscript 06_combine_plot.R /output sampleA,sampleB --out=/output/figs --prefix=exp1 --min-size=1000
+#
+#   # 異なるディレクトリのサンプルを比較
 #   Rscript 06_combine_plot.R --out=/figs /output/A:sampleA /output/B:sampleB
+#
+#   # TSVから読み込み（パイプライン再実行不要）
+#   Rscript 06_combine_plot.R /output sampleA,sampleB,sampleC --from-tsv --min-size=1000
 # =============================================================================
 
 run_combine_plots <- function(entries, out_dir, prefix = "combined",
@@ -226,6 +236,80 @@ run_combine_plots <- function(entries, out_dir, prefix = "combined",
       labs(x = "Library", y = "Diameter") +
       my_plot2
     save_pdf(p, "diameter", pdf_width = max(7, 2 * n))
+  }
+
+  # ============================================================
+  # 6. Antibody Counts（violin + boxplot、抗体別）
+  # ============================================================
+  ac <- load_combine("05_antibody_counts")
+  if (!is.null(ac) && nrow(ac) > 0) {
+    write_log(paste0("  Loaded antibody_counts: ", nrow(ac), " rows"))
+
+    # min_size でフィルタリング（オプション）
+    # クラスター規模情報と結合してフィルタする
+    if (min_size > 0) {
+      cs_all <- load_combine("03_cluster_size")
+      if (!is.null(cs_all)) {
+        large_clusters <- cs_all[total > min_size, .(library, community_id)]
+        n_before <- nrow(ac)
+        # library と community_id でマッチングしてフィルタ
+        ac <- merge(ac, large_clusters, by = c("library", "community_id"), all = FALSE)
+        write_log(paste0("  Filtered by min_size=", min_size, ": ",
+                         n_before, " -> ", nrow(ac), " rows"))
+      }
+    }
+
+    if (nrow(ac) > 0) {
+      # サンプル順を整理
+      ac[, library := factor(library, levels = names_ordered)]
+
+      # 抗体名のユニークリストを取得（アルファベット順）
+      antibody_list <- sort(unique(ac$antibody))
+      n_antibodies <- length(antibody_list)
+
+      # プロット1: 抗体別の比較（サンプルを色分け）
+      p1 <- ggplot(ac, aes(x = antibody, y = count, fill = library)) +
+        geom_violin(position = position_dodge(width = 0.9), alpha = 0.7) +
+        geom_boxplot(width = 0.15, position = position_dodge(width = 0.9),
+                     notch = use_notch(ac, "antibody"), outlier.size = 0.5) +
+        labs(x = "Antibody", y = "Count per Cluster", fill = "Library") +
+        scale_y_log10() +
+        my_plot2 +
+        theme(legend.position = "right",
+              legend.text = element_text(size = 10),
+              axis.text.x = element_text(angle = 45, hjust = 1))
+      save_pdf(p1, "antibody_counts", pdf_width = max(7, 1.5 * n_antibodies + 2))
+
+      # プロット2: サンプル別の比較（抗体でfacet）
+      if (n_antibodies <= 6) {
+        # 抗体数が少ない場合は横並び
+        p2 <- ggplot(ac, aes(x = library, y = count)) +
+          geom_violin() +
+          geom_boxplot(width = 0.1, notch = use_notch(ac, "library")) +
+          facet_wrap(~ antibody, nrow = 1) +
+          labs(x = "Library", y = "Count per Cluster") +
+          scale_y_log10() +
+          my_plot2 +
+          theme(axis.text.x = element_text(angle = 45, hjust = 1))
+        save_pdf(p2, "antibody_counts_by_sample", pdf_width = max(7, 3.5 * n_antibodies))
+      } else {
+        # 抗体数が多い場合は2列レイアウト
+        p2 <- ggplot(ac, aes(x = library, y = count)) +
+          geom_violin() +
+          geom_boxplot(width = 0.1, notch = use_notch(ac, "library")) +
+          facet_wrap(~ antibody, ncol = 2, scales = "free_y") +
+          labs(x = "Library", y = "Count per Cluster") +
+          scale_y_log10() +
+          my_plot2 +
+          theme(axis.text.x = element_text(angle = 45, hjust = 1))
+        n_rows <- ceiling(n_antibodies / 2)
+        save_pdf(p2, "antibody_counts_by_sample", pdf_width = 12)
+      }
+    } else {
+      write_log("  No antibody counts to plot after filtering")
+    }
+  } else {
+    write_log("  No antibody_counts data found (Mix data only)")
   }
 
   write_log(paste0("[06_combine_plot] DONE: ", Sys.time()))

@@ -17,7 +17,7 @@
 #   {save_path}/{name}_05_diameter.pdf
 #
 # 使い方（スタンドアロン）:
-#   Rscript 05_plot.R <name> <save_path> [--from-tsv] [--ego-xlim=min,max] [--rds-dir=path]
+#   Rscript 05_plot.R <name> <save_path> [--from-tsv] [--ego-xlim=min,max] [--rds-dir=path] [--min-size=N]
 #
 #   --from-tsv: RDS の代わりに TSV ファイルから読み込む
 #               計算ステップを再実行せずに図だけ作り直す場合に使用
@@ -26,9 +26,13 @@
 #   --rds-dir=path: RDS/TSVファイルの読み込み元ディレクトリ（デフォルト: save_path）
 #                   PDFは引き続き save_path へ出力される
 #                   例: --rds-dir=. で現在ディレクトリから読み込み
+#   --min-size=N: クラスターサイズの最小閾値（デフォルト: 0 = 全クラスター）
+#                 cluster_size と antibody_counts プロットに適用される
+#                 例: --min-size=1000
 # =============================================================================
 
-run_plots <- function(name, save_path, from_tsv = FALSE, ego_xlim = c(4, 2000), rds_dir = NULL) {
+run_plots <- function(name, save_path, from_tsv = FALSE, ego_xlim = c(4, 2000),
+                      rds_dir = NULL, min_cluster_size = 0L) {
 
   log_file <- file.path(save_path, paste0(name, "_process.log"))
   write_log <- function(msg) {
@@ -41,7 +45,8 @@ run_plots <- function(name, save_path, from_tsv = FALSE, ego_xlim = c(4, 2000), 
 
   write_log(paste0("[05_plot] START: ", Sys.time(),
                    "  from_tsv=", from_tsv,
-                   "  rds_dir=", rds_dir))
+                   "  rds_dir=", rds_dir,
+                   "  min_cluster_size=", min_cluster_size))
 
   # ---- テーマ設定 ----
   my_plot2 <- theme_bw() +
@@ -81,16 +86,28 @@ run_plots <- function(name, save_path, from_tsv = FALSE, ego_xlim = c(4, 2000), 
   # ============================================================
   ms <- load_data("03_cluster_size")
   if (!is.null(ms) && nrow(ms) > 0) {
-    ms$library <- name
-    p <- ggplot(ms, aes(x = library, y = total)) +
-      geom_violin() +
-      geom_boxplot(width = 0.1, notch = (nrow(ms) > 5)) +
-      labs(x = "Library", y = "Total Number of Nodes per Cluster") +
-      scale_y_log10() +
-      my_plot2
-    pdf_out <- file.path(save_path, paste0(name, "_05_cluster_size.pdf"))
-    pdf(pdf_out); print(p); dev.off()
-    write_log(paste0("  Saved: ", basename(pdf_out)))
+    # min_cluster_size でフィルタリング
+    n_before <- nrow(ms)
+    if (min_cluster_size > 0) {
+      ms <- ms[total > min_cluster_size]
+      write_log(paste0("  Cluster size filtered: ", n_before, " -> ", nrow(ms),
+                       " (min_cluster_size=", min_cluster_size, ")"))
+    }
+
+    if (nrow(ms) > 0) {
+      ms$library <- name
+      p <- ggplot(ms, aes(x = library, y = total)) +
+        geom_violin() +
+        geom_boxplot(width = 0.1, notch = (nrow(ms) > 5)) +
+        labs(x = "Library", y = "Total Number of Nodes per Cluster") +
+        scale_y_log10() +
+        my_plot2
+      pdf_out <- file.path(save_path, paste0(name, "_05_cluster_size.pdf"))
+      pdf(pdf_out); print(p); dev.off()
+      write_log(paste0("  Saved: ", basename(pdf_out)))
+    } else {
+      write_log(paste0("  SKIP cluster_size plot: no clusters with > ", min_cluster_size, " nodes"))
+    }
   }
 
   # ============================================================
@@ -183,6 +200,21 @@ run_plots <- function(name, save_path, from_tsv = FALSE, ego_xlim = c(4, 2000), 
                        paste(head(antibody_cols, 5), collapse = ", "),
                        if (length(antibody_cols) > 5) "..." else ""))
 
+      # min_cluster_size でフィルタリング（大きなクラスターのみ集計）
+      membership_dt <- as.data.table(membership)
+      if (min_cluster_size > 0) {
+        # cluster_size データを読み込んでフィルタ
+        cluster_size <- load_data("03_cluster_size")
+        if (!is.null(cluster_size)) {
+          large_ids <- cluster_size[total > min_cluster_size, community_id]
+          n_before <- uniqueN(membership_dt$community_id)
+          membership_dt <- membership_dt[community_id %in% large_ids]
+          write_log(paste0("  Filtered clusters for antibody counts: ",
+                           n_before, " -> ", uniqueN(membership_dt$community_id),
+                           " (min_cluster_size=", min_cluster_size, ")"))
+        }
+      }
+
       # 抗体名を抽出（.t1, .t2 を除去してグループ化）
       # 例: CTCF.t1, CTCF.t2 → CTCF
       antibody_names <- unique(gsub("\\.(t1|t2|m1)$", "", antibody_cols))
@@ -194,7 +226,6 @@ run_plots <- function(name, save_path, from_tsv = FALSE, ego_xlim = c(4, 2000), 
         if (length(ab_cols) == 0) return(NULL)
 
         # クラスターごとに合計
-        membership_dt <- as.data.table(membership)
         agg <- membership_dt[, .(count = sum(.SD, na.rm = TRUE)),
                              by = community_id,
                              .SDcols = ab_cols]
@@ -246,13 +277,14 @@ if (!exists("IBMSEQ_SOURCED")) {
 
   args <- commandArgs(trailingOnly = TRUE)
   if (length(args) < 2) {
-    stop("Usage: Rscript 05_plot.R <name> <save_path> [--from-tsv] [--ego-xlim=min,max] [--rds-dir=path]")
+    stop("Usage: Rscript 05_plot.R <name> <save_path> [--from-tsv] [--ego-xlim=min,max] [--rds-dir=path] [--min-size=N]")
   }
-  name      <- args[1]
-  save_path <- args[2]
-  from_tsv  <- "--from-tsv" %in% args
-  ego_xlim  <- c(4, 2000)  # デフォルト
-  rds_dir   <- NULL        # デフォルト（save_path と同じ）
+  name             <- args[1]
+  save_path        <- args[2]
+  from_tsv         <- "--from-tsv" %in% args
+  ego_xlim         <- c(4, 2000)  # デフォルト
+  rds_dir          <- NULL        # デフォルト（save_path と同じ）
+  min_cluster_size <- 0L          # デフォルト（フィルタなし）
 
   # オプション解析
   for (a in args[-(1:2)]) {
@@ -265,8 +297,10 @@ if (!exists("IBMSEQ_SOURCED")) {
       }
     } else if (grepl("^--rds-dir=", a)) {
       rds_dir <- sub("^--rds-dir=", "", a)
+    } else if (grepl("^--min-size=[0-9]+$", a)) {
+      min_cluster_size <- as.integer(sub("^--min-size=", "", a))
     }
   }
 
-  run_plots(name, save_path, from_tsv, ego_xlim, rds_dir)
+  run_plots(name, save_path, from_tsv, ego_xlim, rds_dir, min_cluster_size)
 }

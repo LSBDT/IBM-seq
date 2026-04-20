@@ -176,7 +176,8 @@ run_features(name, save_path, min_cluster_size, num_cores,
 # Step 5: 作図
 # ============================================================
 cat("\n--- Step 5: Plot ---\n")
-run_plots(name, save_path, from_tsv = from_tsv, ego_xlim = ego_xlim)
+run_plots(name, save_path, from_tsv = from_tsv, ego_xlim = ego_xlim,
+          min_cluster_size = min_cluster_size)
 
 cat(paste0("\n=== IBMseq Pipeline DONE: ", Sys.time(), " ===\n"))
 cat(paste0("Output: ", save_path, "\n"))
